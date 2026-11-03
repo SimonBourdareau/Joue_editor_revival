@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleName</key><string>Joue Revival</string>
+<key>CFBundleDisplayName</key><string>Joué Revival</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
+<key>CFBundleIdentifier</key><string>org.joue-revival.editor</string>
+<key>CFBundleExecutable</key><string>joue_editor</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>@VERSION@</string>
+<key>CFBundleVersion</key><string>@VERSION@</string>
+<key>LSMinimumSystemVersion</key><string>11.0</string>
+<key>NSHumanReadableCopyright</key><string>Copyright (C) 2026 Simon Bourdareau, GNU GPL v3 or later</string>
+<key>NSHighResolutionCapable</key><true/>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+</dict></plist>

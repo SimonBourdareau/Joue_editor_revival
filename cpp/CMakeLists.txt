@@ -1,0 +1,100 @@
+cmake_minimum_required(VERSION 3.20)
+project(joue_editor_ng VERSION 0.37.0 LANGUAGES CXX)
+# the version shown in the program and in the About window comes from here
+add_compile_definitions(JOUE_VERSION="${PROJECT_VERSION}")
+if(WIN32)
+  enable_language(RC)  # the icon and the version information of the executable
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# MinGW builds run on a clean Windows machine without the compiler's runtime DLLs
+if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  add_link_options(-static -static-libgcc -static-libstdc++)
+endif()
+
+include(FetchContent)
+FetchContent_Declare(pugixml GIT_REPOSITORY https://github.com/zeux/pugixml.git GIT_TAG v1.14 GIT_SHALLOW TRUE)
+FetchContent_Declare(glfw GIT_REPOSITORY https://github.com/glfw/glfw.git GIT_TAG 3.4 GIT_SHALLOW TRUE)
+FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG v1.91.9 GIT_SHALLOW TRUE)
+
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(pugixml)
+
+add_library(joue_core STATIC
+  core/src/bytes.cpp core/src/sysex.cpp core/src/transfer.cpp core/src/device.cpp
+  core/src/blob.cpp core/src/library.cpp core/src/endpoints.cpp core/src/coremidi.cpp core/src/winmidi.cpp core/src/alsamidi.cpp core/src/midi_stub.cpp
+  core/src/moduleart.cpp core/src/deviceinfo.cpp core/src/compare.cpp core/src/update.cpp core/src/settingsmeta.cpp core/src/designer.cpp core/src/midiparse.cpp core/src/live.cpp core/src/modulewrite.cpp core/src/i18n.cpp core/src/bindings.cpp core/src/instrumentmodule.cpp core/src/printout.cpp)
+target_include_directories(joue_core PUBLIC core/include)
+target_link_libraries(joue_core PUBLIC pugixml::pugixml)
+find_package(Threads REQUIRED)
+target_link_libraries(joue_core PUBLIC Threads::Threads)
+if(MSVC)
+  target_compile_options(joue_core PRIVATE /W3 /utf-8)
+else()
+  target_compile_options(joue_core PRIVATE -Wall -Wextra $<$<CXX_COMPILER_ID:GNU>:-Wno-maybe-uninitialized>)
+endif()
+if(WIN32)
+  target_link_libraries(joue_core PUBLIC winmm)
+elseif(NOT APPLE)
+  find_package(ALSA)
+  if(ALSA_FOUND)
+    target_compile_definitions(joue_core PUBLIC JOUE_HAVE_ALSA)
+    target_include_directories(joue_core PRIVATE ${ALSA_INCLUDE_DIRS})
+    target_link_libraries(joue_core PUBLIC ${ALSA_LIBRARIES})
+  endif()
+endif()
+if(APPLE)
+  set_source_files_properties(core/src/coremidi.cpp PROPERTIES COMPILE_OPTIONS "-Wno-deprecated-declarations")
+  target_link_libraries(joue_core PUBLIC "-framework CoreMIDI" "-framework CoreFoundation")
+endif()
+
+FetchContent_MakeAvailable(glfw imgui)
+find_package(OpenGL REQUIRED)
+add_library(imgui_lib STATIC
+  ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp ${imgui_SOURCE_DIR}/imgui_tables.cpp ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+  ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
+target_include_directories(imgui_lib PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${imgui_SOURCE_DIR}/misc/cpp)
+target_link_libraries(imgui_lib PUBLIC glfw OpenGL::GL)
+if(APPLE)
+  target_compile_definitions(imgui_lib PUBLIC GL_SILENCE_DEPRECATION)
+endif()
+
+add_library(editor_lib STATIC app/editor.cpp app/designer.cpp app/blobdraw.cpp app/liveview.cpp app/updatecheck.cpp app/texture.cpp app/logo.cpp)
+target_include_directories(editor_lib PRIVATE third_party)
+if(MSVC)
+  set_source_files_properties(app/texture.cpp PROPERTIES COMPILE_OPTIONS "/W0")
+else()
+  set_source_files_properties(app/texture.cpp PROPERTIES COMPILE_OPTIONS "-w")
+endif()
+target_include_directories(editor_lib PUBLIC app)
+target_link_libraries(editor_lib PUBLIC joue_core imgui_lib)
+if(MSVC)
+  target_compile_options(editor_lib PRIVATE /W3 /utf-8)
+else()
+  # the texts of the interface come from the catalogue of translations, whose format strings are trusted
+  target_compile_options(editor_lib PRIVATE -Wall -Wextra -Wno-format-security)
+endif()
+if(WIN32)
+  target_link_libraries(editor_lib PUBLIC comdlg32 shell32 winhttp)
+endif()
+
+add_executable(joue_editor app/main.cpp)
+target_link_libraries(joue_editor PRIVATE editor_lib)
+if(WIN32)
+  set_target_properties(joue_editor PROPERTIES WIN32_EXECUTABLE FALSE)
+  set(JOUE_ICON_PATH ${CMAKE_CURRENT_SOURCE_DIR}/app/icons/joue-revival.ico)
+  configure_file(app/joue.rc.in ${CMAKE_CURRENT_BINARY_DIR}/joue.rc @ONLY)
+  target_sources(joue_editor PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/joue.rc)
+endif()

@@ -1,0 +1,168 @@
+# Makes a release from the source code. Push a tag that starts with v, with the same number as the version in cpp/CMakeLists.txt:
+#
+#   git tag v0.37.0 && git push origin v0.37.0
+#
+# The workflow checks that the tag is the version of the project, builds and tests Linux, macOS and Windows, makes the packages and the installers
+# that it can, adds the source of the tag and the checksums, writes the notes from the commits since the previous tag, and publishes the release.
+# Run by hand (Actions > Release > Run workflow) it does the same without publishing, unless "publish" is ticked: a dry run whose packages can be
+# downloaded from the run.
+#
+# Optional secrets, for a macOS app that is signed and notarized (otherwise it is signed ad hoc): MACOS_CERTIFICATE, MACOS_CERTIFICATE_PASSWORD,
+# MACOS_SIGN_IDENTITY, APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD. See packaging/notarize-macos.sh.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish the release of the tag chosen in "Use workflow from" (leave off for a dry run)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Version
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag is the version of the project
+        run: packaging/check-version.sh "${GITHUB_REF_NAME}"
+
+  linux:
+    name: Linux
+    needs: check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Packages
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl-dev libasound2-dev
+      - name: Configure
+        run: cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j 4
+      - name: Package
+        run: packaging/package-release.sh linux build dist
+      - name: AppImage
+        continue-on-error: true
+        run: |
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          APPIMAGETOOL="$PWD/appimagetool" packaging/make-appimage.sh build dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: dist/*
+
+  macos:
+    name: macOS ${{ matrix.arch }}
+    needs: check
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+    env:
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+            experimental: false
+          - os: macos-15-intel
+            arch: x86_64
+            experimental: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j 4
+      - name: Package
+        run: packaging/package-release.sh macos build dist
+      - name: Sign and notarize
+        if: env.MACOS_CERTIFICATE != ''
+        run: packaging/notarize-macos.sh "dist/joue-revival-macos-${{ matrix.arch }}.zip"
+      - name: Disk image
+        continue-on-error: true
+        run: packaging/make-dmg.sh "dist/joue-revival-macos-${{ matrix.arch }}.zip" dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-${{ matrix.arch }}
+          path: dist/*
+
+  windows:
+    name: Windows
+    needs: check
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            zip
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+      - name: Configure
+        run: cmake -S cpp -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j 4
+      - name: Package
+        run: packaging/package-release.sh windows build dist
+      - name: Installer
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $version = (Select-String -Path cpp/CMakeLists.txt -Pattern '^project\(\S+ VERSION ([0-9.]+)').Matches[0].Groups[1].Value
+          Expand-Archive -Path dist/joue-revival-windows-x64.zip -DestinationPath stage
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" "/DSourceDir=$PWD\stage\joue-revival-windows-x64" "/O$PWD\dist" packaging\windows\joue-revival.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/*
+
+  publish:
+    name: Publish
+    needs: [linux, macos, windows]
+    if: startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'push' || inputs.publish)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Source, checksums and notes
+        run: |
+          git archive --format=zip --prefix="joue-revival-${GITHUB_REF_NAME#v}/" -o "dist/joue-revival-${GITHUB_REF_NAME}-source.zip" "${GITHUB_REF_NAME}"
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+          packaging/release-notes.sh "${GITHUB_REF_NAME}" > notes.md
+          ls -l dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Joué Revival ${{ github.ref_name }}
+          body_path: notes.md
+          files: dist/*
+          prerelease: ${{ contains(github.ref_name, '-') }}

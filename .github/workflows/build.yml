@@ -1,0 +1,88 @@
+# Builds Joué Revival on Linux, macOS and Windows and runs the tests, on every push and pull request.
+# The release (installers, checksums, notes, the GitHub release itself) is made by release.yml when a tag that starts with v is pushed.
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Packages
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl-dev libasound2-dev
+      - name: Configure
+        run: cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j 4
+      - name: Package
+        run: packaging/package-release.sh linux build dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-linux
+          path: dist/*
+
+  macos:
+    name: macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest        # Apple silicon
+            arch: arm64
+            experimental: false
+          - os: macos-15-intel      # Intel; the runner label may change, so a failure here does not stop the rest
+            arch: x86_64
+            experimental: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j 4
+      - name: Package
+        run: packaging/package-release.sh macos build dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-macos-${{ matrix.arch }}
+          path: dist/*
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            zip
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+      - name: Configure
+        run: cmake -S cpp -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j 4
+      - name: Package
+        run: packaging/package-release.sh windows build dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-windows
+          path: dist/*

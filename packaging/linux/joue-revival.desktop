@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Joué Revival
+GenericName=Editor for the Joué instrument
+Comment=Libraries, live instrument, modules and module designer for the Joué
+Exec=joue_editor
+Icon=joue-revival
+Terminal=false
+Categories=AudioVideo;Audio;Music;
