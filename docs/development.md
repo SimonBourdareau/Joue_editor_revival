@@ -50,7 +50,7 @@ The language is chosen in the View menu; `--lang en|fr` overrides it for a start
 
 Two workflows in `.github/workflows` (both pass `actionlint`).
 
-**`build.yml`** runs on every push to `main` or `master` and on pull requests (and by hand): it builds **Linux** (Ubuntu 22.04), **macOS** (Apple silicon; an Intel build is tried too and may fail without stopping the rest) and **Windows** (MSYS2 MinGW-w64).
+**`build.yml`** runs on every push to `main` or `master` and on pull requests (and by hand): it builds **Linux** (Ubuntu 22.04), **macOS** (Apple silicon) and **Windows** (MSYS2 MinGW-w64).
 
 **`release.yml`** makes a release from the source code when a tag that starts with `v` is pushed:
 

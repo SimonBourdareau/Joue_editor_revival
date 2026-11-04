@@ -16,7 +16,6 @@ Free software under the GNU GPL v3 or later. Each package has the README and the
 | `joue-revival-windows-x64-setup.exe` | Windows 64-bit, with an installer (when it could be made) |
 | `joue-revival-windows-x64.zip` | Windows 64-bit, no installer: unzip and run `JoueRevival.exe` |
 | `joue-revival-macos-arm64.dmg`, `.zip` | macOS, Apple silicon. Without a notarization the first start needs `xattr -cr "Joue Revival.app"` |
-| `joue-revival-macos-x86_64.dmg`, `.zip` | macOS, Intel (when the runner was available) |
 | `joue-revival-linux-x86_64.AppImage`, `.tar.gz` | Linux, 64-bit, on X11 or XWayland |
 | `joue-revival-*-source.zip` | the source of this version |
 

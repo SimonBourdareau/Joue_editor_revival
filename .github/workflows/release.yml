@@ -2,7 +2,7 @@
 #
 #   git tag v0.37.0 && git push origin v0.37.0
 #
-# The workflow checks that the tag is the version of the project, builds and tests Linux, macOS and Windows, makes the packages and the installers
+# The workflow checks that the tag is the version of the project, builds Linux, macOS (Apple silicon) and Windows, makes the packages and the installers
 # that it can, adds the source of the tag and the checksums, writes the notes from the commits since the previous tag, and publishes the release.
 # Run by hand (Actions > Release > Run workflow) it does the same without publishing, unless "publish" is ticked: a dry run whose packages can be
 # downloaded from the run.
@@ -32,6 +32,7 @@ jobs:
   check:
     name: Version
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: The tag is the version of the project
@@ -41,6 +42,7 @@ jobs:
     name: Linux
     needs: check
     runs-on: ubuntu-22.04
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - name: Packages
@@ -66,6 +68,7 @@ jobs:
     name: macOS ${{ matrix.arch }}
     needs: check
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     continue-on-error: ${{ matrix.experimental }}
     env:
       MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
@@ -81,9 +84,6 @@ jobs:
           - os: macos-latest
             arch: arm64
             experimental: false
-          - os: macos-15-intel
-            arch: x86_64
-            experimental: true
     steps:
       - uses: actions/checkout@v4
       - name: Configure
@@ -107,6 +107,7 @@ jobs:
     name: Windows
     needs: check
     runs-on: windows-latest
+    timeout-minutes: 60
     defaults:
       run:
         shell: msys2 {0}
@@ -143,6 +144,7 @@ jobs:
 
   publish:
     name: Publish
+    timeout-minutes: 20
     needs: [linux, macos, windows]
     if: startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'push' || inputs.publish)
     runs-on: ubuntu-22.04

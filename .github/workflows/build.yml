@@ -1,4 +1,4 @@
-# Builds Joué Revival on Linux, macOS and Windows and runs the tests, on every push and pull request.
+# Builds Joué Revival on Linux, macOS (Apple silicon) and Windows, on every push and pull request.
 # The release (installers, checksums, notes, the GitHub release itself) is made by release.yml when a tag that starts with v is pushed.
 name: Build
 
@@ -10,12 +10,13 @@ on:
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   linux:
     name: Linux
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Packages
@@ -34,6 +35,7 @@ jobs:
   macos:
     name: macOS ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
@@ -42,9 +44,6 @@ jobs:
           - os: macos-latest        # Apple silicon
             arch: arm64
             experimental: false
-          - os: macos-15-intel      # Intel; the runner label may change, so a failure here does not stop the rest
-            arch: x86_64
-            experimental: true
     steps:
       - uses: actions/checkout@v4
       - name: Configure
@@ -61,6 +60,7 @@ jobs:
   windows:
     name: Windows
     runs-on: windows-latest
+    timeout-minutes: 45
     defaults:
       run:
         shell: msys2 {0}
