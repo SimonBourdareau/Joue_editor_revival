@@ -12,10 +12,9 @@ Joué Revival reads and edits the preset libraries of the original Joué Editor,
 
 - **Editor:** `cpp/app` is a Dear ImGui program in C++17; `cpp/core` is the engine (MIDI/SysEx transfer, module layouts, library files).
 - **Tested hardware:** a Joué Pro (hardware id 2, firmware 1.11 build 80) with the Matrix, Grand Clavier, Scaler and Grand Fretboard modules.
-- **Platforms:** used by its author on Windows 11 and on an Apple-silicon Mac. The Linux build is tested with a simulated board only, not with an instrument.
+- **Platforms:** used and tested on Windows 11 and on an Apple-silicon Mac. The Linux build is not tested with an instrument.
 - **Languages:** the interface and the documents are in English and in French.
-- **Not included:** the manufacturer's factory library. Open the one that comes with the original editor.
-- **Not affiliated:** this program is independent. It is not made, endorsed or supported by Joué.
+- **Not affiliated:** It is not made, endorsed or supported by Joué. Use the editor at your own risk. It does not touch Joué firmware and will never do. I do not want to be responsible for bricking the instruments.
 
 > [!WARNING]
 > **Uploading writes to the tag of a module.** The module's previous layout is saved as a file first and can be restored.
@@ -52,9 +51,9 @@ Download `joue-revival-linux-x86_64.AppImage`, make it executable (`chmod +x jou
 
 1. **Quit the original Joué Editor.** It holds the instrument's MIDI ports.
 2. Connect the Joué by USB. The **Live instrument** panel at the top says *Connected* and shows the modules in the three slots.
-3. **File > Open...** and choose the factory library of the original editor (`macos.factoryLibrary.xml` on a Mac, `editor.factoryLibrary.xml` on Windows). It is not part of this program.
+3. **File > Open...** and the factory library of the original editor (`factoryLibrary.xml`). It is provided here.
 
-## What you can do
+## What you can do with the Joué Revival Editor
 
 - **Browse and edit libraries:** the factory presets (locked, and not deletable), your own folders and copies, saved with a backup of the previous file.
 - **See the instrument live:** the modules in the slots, the touches, the octave of the keys; **touch to select**, which selects in the editor the element your finger is on; **Rescan modules** and a detection log when something looks wrong.
@@ -66,7 +65,7 @@ Download `joue-revival-linux-x86_64.AppImage`, make it executable (`chmod +x jou
 
 See the [User guide](docs/user-guide.md) for the windows, the files and troubleshooting. The interface is in English or French (**View > Language / Langue**); the documents are in both: [README.fr.md](README.fr.md), [guide de l'utilisateur](docs/user-guide.fr.md), [guide du concepteur de modules](docs/module-designer.fr.md).
 
-## Build from source
+## Build from source (For advanced users)
 
 Needs CMake 3.20 or newer, a C++17 compiler and git. The first configure downloads pugixml, GLFW and Dear ImGui from GitHub, so it needs a network connection. A short version for each system is below; the [Development guide](docs/development.md) has the details.
 
