@@ -4,13 +4,14 @@
 
 Un éditeur indépendant pour l'instrument Joué : les bibliothèques, l'instrument en direct, les réglages de ses modules, et un concepteur de modules.
 
-![Joué Revival](editor-preview.png)
+![Joué Revival](editor-preview-fr.png)
 
 ## En bref
 
-- **Paquet :** `JoueRevival.exe` (64 bits, sans installateur, sans DLL supplémentaire), `JoueRevival-safe-graphics.bat`, ce README, `user-guide.fr.md`, `module-designer.fr.md` et leurs versions anglaises `README.md`, `user-guide.md`, `module-designer.md` (dans le dépôt ces documents sont dans le dossier `docs`).
+- **Paquet :** `JoueRevival.exe` (64 bits, sans DLL supplémentaire ; il existe aussi un programme d'installation), `JoueRevival-safe-graphics.bat`, ce README, `user-guide.fr.md`, `module-designer.fr.md` et leurs versions anglaises `README.md`, `user-guide.md`, `module-designer.md` (dans le dépôt ces documents sont dans le dossier `docs`).
 - **Testé :** utilisé par son auteur sous Windows 11 avec un Joué Pro. L'exécutable est compilé en croisé avec MinGW-w64 et fonctionne aussi sous Wine.
-- **Non inclus :** la bibliothèque d'usine du fabricant ; ouvrez celle de l'éditeur d'origine (`editor.factoryLibrary.xml`).
+- **Préréglages :** les préréglages d'usine sont dans le dossier `presets` et se chargent au premier démarrage.
+- **Non affilié :** il n'est ni fabriqué, ni approuvé, ni soutenu par Joué. Utilisez l'éditeur à vos risques. Il ne touche pas au micrologiciel du Joué et ne le fera jamais. Je ne veux pas être responsable de la mise hors service des instruments.
 - **Fichiers :** le dossier de données est `%APPDATA%\JoueEditorNG`.
 
 > [!WARNING]
@@ -30,7 +31,7 @@ Pour supprimer le programme, supprimez le dossier, et `%APPDATA%\JoueEditorNG` s
 
 1. **Quittez l'éditeur Joué d'origine.** Il garde les ports MIDI de l'instrument.
 2. Branchez le Joué en USB. Le panneau **Instrument en direct**, en haut, indique *Connecté* et montre les modules.
-3. **Fichier > Ouvrir...** et choisissez la bibliothèque d'usine de l'éditeur d'origine (`editor.factoryLibrary.xml`). Elle ne fait pas partie de ce programme.
+3. Les préréglages d'usine (`presets/factoryLibrary.xml`) se chargent tout seuls la première fois. **Fichier > Ouvrir...** ouvre une autre bibliothèque, et **Enregistrer** garde la vôtre.
 
 Sous Windows 11 plusieurs programmes peuvent écouter les ports MIDI de l'instrument en même temps. Sur les systèmes plus anciens le premier programme qui ouvre un port le garde ; si un autre programme perd les notes, désactivez **Affichage > Écouter le port Play (contacts)**.
 
@@ -78,4 +79,4 @@ build\Release\joue_editor.exe
 
 ## Licence et crédits
 
-Joué Revival est un logiciel libre sous **licence publique générale GNU v3 ou ultérieure** : voir `LICENSE` dans le dépôt. Copyright (C) 2026 Simon Bourdareau. Il est fourni sans aucune garantie. Les bibliothèques d'usine du fabricant n'en font pas partie et ne sont pas couvertes par sa licence. Les formats viennent de la rétro-ingénierie des éditeurs du fabricant et du micrologiciel, et du projet officiel [J-Play](https://github.com/Pjoooo/jplay-opensource) (GPL-3.0). Dear ImGui, GLFW, pugixml et stb_image sont utilisés sous leurs propres licences. Programme indépendant : ni fabriqué, ni approuvé, ni soutenu par Joué.
+Joué Revival est un logiciel libre sous **licence publique générale GNU v3 ou ultérieure** : voir `LICENSE` dans le dépôt. Copyright (C) 2026 Simon Bourdareau. Il est fourni sans aucune garantie. Les préréglages d'usine de `presets/` viennent de l'application du fabricant : ils sont inclus pour que le programme fonctionne tout de suite, et ils ne sont pas couverts par la GPL. Les formats viennent de la rétro-ingénierie des éditeurs du fabricant et du micrologiciel, et du projet officiel [J-Play](https://github.com/Pjoooo/jplay-opensource) (GPL-3.0). Dear ImGui, GLFW, pugixml et stb_image sont utilisés sous leurs propres licences. Programme indépendant : ni fabriqué, ni approuvé, ni soutenu par Joué.

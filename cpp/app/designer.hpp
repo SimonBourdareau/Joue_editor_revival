@@ -29,6 +29,7 @@ public:
 
     void newDesign(int slots);
     bool openFile(const std::string& path);
+    bool openBlob(const joue::Bytes& blob, const std::string& savePath, const std::string& source);
     bool saveFile(const std::string& path);
     void draw();
     joue::Design& design() { return design_; }
@@ -42,7 +43,7 @@ private:
         joue::Bytes data;
         int slots;
     };
-    enum class Drag { None, Move, Resize, Group, Gather };
+    enum class Drag { None, Move, Resize, Group, GroupResize, Band };
 
     void pushUndo();
     void undo();
@@ -75,6 +76,9 @@ private:
     std::vector<joue::Box> groupStart_;       // where the picked elements were when a move of all of them began
     int dragAxis_ = 0;                        // 0: a corner, both ways; 1: an edge, the width only; 2: an edge, the height only
     int swapTarget_ = -1;                     // the element that a shift-drag would swap with if the pointer were let go now
+    int ctrlHit_ = -1;                        // the element a ctrl-press landed on: a click that goes nowhere takes it off the picks again
+    bool ctrlWasPicked_ = false;
+    bool bandAdd_ = false;                    // the selection rectangle adds to the picks instead of replacing them
     float travel_ = 0;                        // how far the pointer has gone since the drag began, in mm
     std::vector<joue::ElementRecord> clipboard_;
     int pasteCount_ = 0, lastTool_ = 1;

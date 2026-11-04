@@ -147,6 +147,24 @@ bool Designer::openFile(const std::string& path) {
     return true;
 }
 
+bool Designer::openBlob(const joue::Bytes& blob, const std::string& savePath, const std::string& source) {
+    try {
+        design_ = joue::Design::fromBytes(blob);
+    } catch (const std::exception& e) {
+        status_ = std::string("Not a module blob: ") + e.what();
+        return false;
+    }
+    path_ = savePath;
+    undo_.clear();
+    redo_.clear();
+    clearPicks();
+    dirty_ = false;
+    scriptLoaded_ = false;
+    open = true;
+    status_ = "Opened " + source + " (" + std::to_string(blob.size()) + " bytes, " + std::to_string(design_.count()) + " elements). Save writes " + savePath + ".";
+    return true;
+}
+
 bool Designer::saveFile(const std::string& path) {
     for (const auto& line : design_.problems()) {
         if (line.rfind("Error", 0) == 0) {
@@ -345,9 +363,18 @@ void Designer::drawCanvas() {
         if (index < 0 || !design_.hasBox(static_cast<std::size_t>(index))) continue;
         ImVec4 r = rectOf(design_.box(static_cast<std::size_t>(index)));
         bool primary = index == selected_;
-        list->AddRect(ImVec2(r.x, r.y), ImVec2(r.z, r.w), primary ? IM_COL32(15, 190, 255, 255) : IM_COL32(100, 175, 255, 230), 0.0f, 0, primary ? 2.0f : 1.5f);
+        list->AddRectFilled(ImVec2(r.x, r.y), ImVec2(r.z, r.w), IM_COL32(255, 255, 255, 45));
+        list->AddRect(ImVec2(r.x, r.y), ImVec2(r.z, r.w), primary ? IM_COL32(15, 190, 255, 255) : IM_COL32(60, 220, 255, 255), 0.0f, 0, 2.0f);
     }
-    if (selected_ >= 0 && design_.hasBox(static_cast<std::size_t>(selected_))) {
+    if (picked_.size() > 1) {
+        std::vector<std::size_t> indices(picked_.begin(), picked_.end());
+        ImVec4 g = rectOf(design_.bounds(indices));
+        list->AddRect(ImVec2(g.x - 3, g.y - 3), ImVec2(g.z + 3, g.w + 3), IM_COL32(255, 255, 255, 170), 0.0f, 0, 1.0f);
+        const float mx = (g.x + g.z) * 0.5f, my = (g.y + g.w) * 0.5f;
+        const ImVec2 spots[8] = {{g.x, g.y}, {mx, g.y}, {g.z, g.y}, {g.x, my}, {g.z, my}, {g.x, g.w}, {mx, g.w}, {g.z, g.w}};
+        for (const ImVec2& spot : spots) list->AddRect(spot - ImVec2(4, 4), spot + ImVec2(4, 4), IM_COL32(255, 255, 255, 230), 0.0f, 0, 1.5f);
+    }
+    if (picked_.size() <= 1 && selected_ >= 0 && design_.hasBox(static_cast<std::size_t>(selected_))) {
         ImVec4 r = rectOf(design_.box(static_cast<std::size_t>(selected_)));
         for (int hnd = 0; hnd < 4; ++hnd) {
             ImVec2 p((hnd & 1) ? r.z : r.x, (hnd & 2) ? r.w : r.y);
@@ -366,7 +393,7 @@ void Designer::drawCanvas() {
         int handle = -1;
         int axis = 0;
     };
-    // a corner of the element the inspector shows stretches both ways, an edge one way
+    // a corner of the element the inspector shows stretches both ways
     auto zoneAt = [&]() -> Zone {
         if (selected_ < 0 || !design_.hasBox(static_cast<std::size_t>(selected_))) return {};
         Box b = design_.box(static_cast<std::size_t>(selected_));
@@ -374,13 +401,6 @@ void Designer::drawCanvas() {
             ImVec2 p = toScreen(static_cast<float>(b.x + ((hnd & 1) ? b.w : 0)), static_cast<float>(b.y + ((hnd & 2) ? b.h : 0)));
             if (std::fabs(io.MousePos.x - p.x) <= 7 && std::fabs(io.MousePos.y - p.y) <= 7) return {hnd, 0};
         }
-        ImVec4 r = rectOf(b);
-        const float t = 5.0f;
-        bool inX = io.MousePos.x >= r.x - t && io.MousePos.x <= r.z + t, inY = io.MousePos.y >= r.y - t && io.MousePos.y <= r.w + t;
-        if (inY && std::fabs(io.MousePos.x - toScreen(static_cast<float>(b.x), 0).x) <= t) return {0, 1};
-        if (inY && std::fabs(io.MousePos.x - toScreen(static_cast<float>(b.x + b.w), 0).x) <= t) return {1, 1};
-        if (inX && std::fabs(io.MousePos.y - toScreenY(static_cast<float>(b.y))) <= t) return {0, 2};
-        if (inX && std::fabs(io.MousePos.y - toScreenY(static_cast<float>(b.y + b.h))) <= t) return {2, 2};
         return {};
     };
     auto elementAt = [&](int skip) -> int {
@@ -391,12 +411,78 @@ void Designer::drawCanvas() {
         }
         return -1;
     };
+    struct Target {
+        bool valid = false;
+        bool group = false;
+        int hit = -1;
+        Box box{};
+        int xEdge = 0;
+        int yEdge = 0;
+    };
+    auto shiftTarget = [&]() -> Target {
+        Target t;
+        int hit = elementAt(-1);
+        if (picked_.size() > 1) {
+            std::vector<std::size_t> indices(picked_.begin(), picked_.end());
+            Box gb = design_.bounds(indices);
+            bool inside = mouse.x >= gb.x && mouse.x <= gb.x + gb.w && mouse.y >= gb.y && mouse.y <= gb.y + gb.h;
+            if (inside && (hit < 0 || isPicked(hit))) {
+                t.group = true;
+                t.hit = hit;
+                t.box = gb;
+            }
+        }
+        if (!t.group) {
+            if (hit < 0) return t;
+            t.hit = hit;
+            t.box = design_.box(static_cast<std::size_t>(hit));
+        }
+        auto side = [](float position, int origin, int size) {
+            float f = (position - static_cast<float>(origin)) / static_cast<float>(std::max(1, size));
+            return f < 0.3f ? -1 : (f > 0.7f ? 1 : 0);
+        };
+        t.valid = true;
+        t.xEdge = side(mouse.x, t.box.x, t.box.w);
+        t.yEdge = side(mouse.y, t.box.y, t.box.h);
+        return t;
+    };
+    auto resizedBox = [&](Box start, int handle, int axis, float dx, float dy) {
+        Box b = start;
+        if (axis != 2) {
+            if (handle & 1) b.w = snapTo(static_cast<float>(start.x + start.w) + dx) - start.x;
+            else { b.x = snapTo(static_cast<float>(start.x) + dx); b.w = start.x + start.w - b.x; }
+        }
+        if (axis != 1) {
+            if (handle & 2) b.h = snapTo(static_cast<float>(start.y + start.h) + dy) - start.y;
+            else { b.y = snapTo(static_cast<float>(start.y) + dy); b.h = start.y + start.h - b.y; }
+        }
+        if (b.w < 2) { if (!(handle & 1)) b.x = start.x + start.w - 2; b.w = 2; }
+        if (b.h < 2) { if (!(handle & 2)) b.y = start.y + start.h - 2; b.h = 2; }
+        return b;
+    };
     if (hovered && tool_ == 0 && drag_ == Drag::None) {
-        Zone z = zoneAt();
-        if (z.handle >= 0 && (z.axis == 0 || io.KeyShift)) ImGui::SetMouseCursor(z.axis == 1 ? ImGuiMouseCursor_ResizeEW : z.axis == 2 ? ImGuiMouseCursor_ResizeNS : (z.handle == 0 || z.handle == 3) ? ImGuiMouseCursor_ResizeNWSE : ImGuiMouseCursor_ResizeNESW);
-        else if (elementAt(-1) >= 0) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        auto diagonal = [&](int xDir, int yDir) {
+            int screenY = mirror ? -yDir : yDir;
+            return xDir * screenY > 0 ? ImGuiMouseCursor_ResizeNWSE : ImGuiMouseCursor_ResizeNESW;
+        };
+        if (add) {
+            if (elementAt(-1) >= 0) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+        } else if (io.KeyShift) {
+            Target t = shiftTarget();
+            if (t.valid) {
+                if (t.xEdge != 0 && t.yEdge != 0) ImGui::SetMouseCursor(diagonal(t.xEdge, t.yEdge));
+                else if (t.xEdge != 0) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                else if (t.yEdge != 0) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                else ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+            }
+        } else {
+            Zone z = zoneAt();
+            if (z.handle >= 0) ImGui::SetMouseCursor(diagonal((z.handle & 1) ? 1 : -1, (z.handle & 2) ? 1 : -1));
+            else if (elementAt(-1) >= 0) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        }
     }
     if (ImGui::IsItemActivated()) {
+        ctrlHit_ = -1;
         swapTarget_ = -1;
         travel_ = 0;
         dragAxis_ = 0;
@@ -420,49 +506,96 @@ void Designer::drawCanvas() {
                 undo_.pop_back();
             }
         } else if (add) {
-            // ctrl-click toggles one element; going on with the button down gathers every element the pointer crosses
-            togglePick(elementAt(-1));
-            drag_ = Drag::Gather;
+            int hit = elementAt(-1);
+            if (hit >= 0) {
+                ctrlWasPicked_ = isPicked(hit);
+                ctrlHit_ = hit;
+                if (!ctrlWasPicked_) addPick(hit);
+                pushUndo();
+                groupStart_.clear();
+                for (int index : picked_) groupStart_.push_back(design_.box(static_cast<std::size_t>(index)));
+                selected_ = hit;
+                drag_ = Drag::Group;
+                dragBox_ = design_.box(static_cast<std::size_t>(hit));
+                dragStartX_ = mouse.x;
+                dragStartY_ = mouse.y;
+            } else {
+                drag_ = Drag::Band;
+                bandAdd_ = true;
+                dragStartX_ = mouse.x;
+                dragStartY_ = mouse.y;
+            }
+        } else if (io.KeyShift) {
+            Target t = shiftTarget();
+            if (t.valid && (t.xEdge != 0 || t.yEdge != 0)) {
+                pushUndo();
+                dragHandle_ = (t.xEdge > 0 ? 1 : 0) | (t.yEdge > 0 ? 2 : 0);
+                dragAxis_ = (t.xEdge != 0 && t.yEdge != 0) ? 0 : (t.xEdge != 0 ? 1 : 2);
+                dragBox_ = t.box;
+                dragStartX_ = mouse.x;
+                dragStartY_ = mouse.y;
+                if (t.group) {
+                    groupStart_.clear();
+                    for (int index : picked_) groupStart_.push_back(design_.box(static_cast<std::size_t>(index)));
+                    drag_ = Drag::GroupResize;
+                } else {
+                    select(t.hit);
+                    drag_ = Drag::Resize;
+                }
+            } else if (t.valid) {
+                pushUndo();
+                if (t.group) {
+                    groupStart_.clear();
+                    for (int index : picked_) groupStart_.push_back(design_.box(static_cast<std::size_t>(index)));
+                    selected_ = t.hit >= 0 ? t.hit : picked_.back();
+                    drag_ = Drag::Group;
+                } else {
+                    select(t.hit);
+                    drag_ = Drag::Move;
+                }
+                dragBox_ = design_.box(static_cast<std::size_t>(selected_));
+                dragStartX_ = mouse.x;
+                dragStartY_ = mouse.y;
+            } else {
+                select(-1);
+                drag_ = Drag::Band;
+                bandAdd_ = false;
+                dragStartX_ = mouse.x;
+                dragStartY_ = mouse.y;
+            }
         } else {
             Zone z = zoneAt();
-            if (z.handle >= 0 && (z.axis == 0 || io.KeyShift)) {
+            if (z.handle >= 0) {
                 pushUndo();
                 drag_ = Drag::Resize;
                 dragHandle_ = z.handle;
-                dragAxis_ = z.axis;
+                dragAxis_ = 0;
                 dragBox_ = design_.box(static_cast<std::size_t>(selected_));
                 dragStartX_ = mouse.x;
                 dragStartY_ = mouse.y;
             } else {
                 int hit = elementAt(-1);
-                if (io.KeyShift && hit >= 0 && isPicked(hit) && picked_.size() > 1) {
-                    // shift-drag on one of several picked elements moves them all, keeping their spacing
+                select(hit);
+                if (hit >= 0) {
                     pushUndo();
-                    groupStart_.clear();
-                    for (int index : picked_) groupStart_.push_back(design_.box(static_cast<std::size_t>(index)));
-                    selected_ = hit;
-                    drag_ = Drag::Group;
+                    drag_ = Drag::Move;
                     dragBox_ = design_.box(static_cast<std::size_t>(hit));
-                    dragStartX_ = mouse.x;
-                    dragStartY_ = mouse.y;
                 } else {
-                    select(hit);
-                    if (hit >= 0) {
-                        pushUndo();
-                        drag_ = Drag::Move;
-                        dragBox_ = design_.box(static_cast<std::size_t>(hit));
-                        dragStartX_ = mouse.x;
-                        dragStartY_ = mouse.y;
-                    }
+                    drag_ = Drag::Band;
+                    bandAdd_ = false;
                 }
+                dragStartX_ = mouse.x;
+                dragStartY_ = mouse.y;
             }
         }
     }
-    if (drag_ == Drag::Gather && ImGui::IsItemActive()) {
-        int over = elementAt(-1);
-        if (over >= 0) addPick(over);
+    if (drag_ == Drag::Band && ImGui::IsItemActive()) {
+        ImVec2 corner = toScreen(dragStartX_, dragStartY_);
+        list->AddRectFilled(corner, io.MousePos, IM_COL32(60, 140, 255, 40));
+        list->AddRect(corner, io.MousePos, IM_COL32(90, 170, 255, 220));
     } else if (drag_ == Drag::Group && ImGui::IsItemActive() && !picked_.empty() && groupStart_.size() == picked_.size()) {
         float dx = mouse.x - dragStartX_, dy = mouse.y - dragStartY_;
+        travel_ = std::sqrt(dx * dx + dy * dy);
         int ddx = snapTo(static_cast<float>(dragBox_.x) + dx) - dragBox_.x, ddy = snapTo(static_cast<float>(dragBox_.y) + dy) - dragBox_.y;
         int minX = 1 << 20, minY = 1 << 20, maxX = -(1 << 20), maxY = -(1 << 20);
         for (const Box& b : groupStart_) {
@@ -477,6 +610,16 @@ void Designer::drawCanvas() {
         for (std::size_t k = 0; k < picked_.size(); ++k) design_.setBox(static_cast<std::size_t>(picked_[k]), groupStart_[k]);
         std::vector<std::size_t> indices(picked_.begin(), picked_.end());
         design_.moveGroup(indices, ddx, ddy);
+    } else if (drag_ == Drag::GroupResize && ImGui::IsItemActive() && !picked_.empty() && groupStart_.size() == picked_.size()) {
+        float dx = mouse.x - dragStartX_, dy = mouse.y - dragStartY_;
+        Box b = resizedBox(dragBox_, dragHandle_, dragAxis_, dx, dy);
+        if (b.x < 0) { b.w += b.x; b.x = 0; }
+        if (b.y < 0) { b.h += b.y; b.y = 0; }
+        b.w = std::min(b.w, design_.widthMm() - b.x);
+        b.h = std::min(b.h, joue::Design::HeightMm - b.y);
+        for (std::size_t k = 0; k < picked_.size(); ++k) design_.setBox(static_cast<std::size_t>(picked_[k]), groupStart_[k]);
+        std::vector<std::size_t> indices(picked_.begin(), picked_.end());
+        design_.resizeGroup(indices, dragBox_, b);
     } else if ((drag_ == Drag::Move || drag_ == Drag::Resize) && ImGui::IsItemActive() && selected_ >= 0) {
         float dx = mouse.x - dragStartX_, dy = mouse.y - dragStartY_;
         Box b = dragBox_;
@@ -491,20 +634,27 @@ void Designer::drawCanvas() {
             int x0 = snapTo(dragStartX_), y0 = snapTo(dragStartY_), x1 = snapTo(mouse.x), y1 = snapTo(mouse.y);
             b = {std::min(x0, x1), std::min(y0, y1), std::max(2, std::abs(x1 - x0)), std::max(2, std::abs(y1 - y0))};
         } else {
-            if (dragAxis_ != 2) {
-                if (dragHandle_ & 1) b.w = snapTo(static_cast<float>(dragBox_.x + dragBox_.w) + dx) - dragBox_.x;
-                else { b.x = snapTo(static_cast<float>(dragBox_.x) + dx); b.w = dragBox_.x + dragBox_.w - b.x; }
-            }
-            if (dragAxis_ != 1) {
-                if (dragHandle_ & 2) b.h = snapTo(static_cast<float>(dragBox_.y + dragBox_.h) + dy) - dragBox_.y;
-                else { b.y = snapTo(static_cast<float>(dragBox_.y) + dy); b.h = dragBox_.y + dragBox_.h - b.y; }
-            }
-            if (b.w < 2) { if (!(dragHandle_ & 1)) b.x = dragBox_.x + dragBox_.w - 2; b.w = 2; }
-            if (b.h < 2) { if (!(dragHandle_ & 2)) b.y = dragBox_.y + dragBox_.h - 2; b.h = 2; }
+            b = resizedBox(dragBox_, dragHandle_, dragAxis_, dx, dy);
         }
         design_.setBox(static_cast<std::size_t>(selected_), b);
     }
     if (drag_ != Drag::None && !ImGui::IsItemActive()) {
+        if (drag_ == Drag::Band && std::fabs(mouse.x - dragStartX_) + std::fabs(mouse.y - dragStartY_) >= 1.0f) {
+            float x0 = std::min(dragStartX_, mouse.x), x1 = std::max(dragStartX_, mouse.x), y0 = std::min(dragStartY_, mouse.y), y1 = std::max(dragStartY_, mouse.y);
+            if (!bandAdd_) clearPicks();
+            for (std::size_t i : order) {
+                if (design_.blob().elements[i].type() == joue::element::Glide) continue;
+                Box b = design_.box(i);
+                if (static_cast<float>(b.x) < x1 && static_cast<float>(b.x + b.w) > x0 && static_cast<float>(b.y) < y1 && static_cast<float>(b.y + b.h) > y0) addPick(static_cast<int>(i));
+            }
+        }
+        if (drag_ == Drag::Group && ctrlHit_ >= 0) {
+            if (travel_ < 1.0f) {
+                if (ctrlWasPicked_) togglePick(ctrlHit_);
+                if (!undo_.empty()) undo_.pop_back();
+            }
+            ctrlHit_ = -1;
+        }
         if (drag_ == Drag::Move && swapTarget_ >= 0 && selected_ >= 0) {
             // let go over another element after a long enough shift-drag: the two trade places, each keeping its size and settings
             design_.setBox(static_cast<std::size_t>(selected_), dragBox_);
@@ -525,13 +675,14 @@ void Designer::drawCanvas() {
     }
 
     // keys act while the pointer is over the surface or the window has the focus
-    if ((hovered || ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) && !io.WantTextInput) {
+    if ((hovered || ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)) && !io.WantTextInput) {
         bool command = io.KeyCtrl || io.KeySuper;
         if (command && ImGui::IsKeyPressed(ImGuiKey_Z)) {
             if (io.KeyShift) redo(); else undo();
         } else if (command && ImGui::IsKeyPressed(ImGuiKey_A)) {
             clearPicks();
             for (std::size_t i : order) addPick(static_cast<int>(i));
+            status_ = "Picked all " + std::to_string(picked_.size()) + (picked_.size() == 1 ? " element." : " elements.");
         } else if (command && ImGui::IsKeyPressed(ImGuiKey_C) && !picked_.empty()) {
             clipboard_.clear();
             for (int index : picked_) clipboard_.push_back(design_.blob().elements[static_cast<std::size_t>(index)]);
@@ -622,6 +773,13 @@ void Designer::drawArrange() {
     const bool mirror = joue::MirrorPictures;
     std::vector<std::size_t> picked = pickedIndices();
     ImGui::SeparatorText(tr("Arrange"));
+    if (ImGui::Button(tr("Select all"))) {
+        clearPicks();
+        for (std::size_t i = 0; i < design_.count(); ++i) {
+            if (design_.hasBox(i)) addPick(static_cast<int>(i));
+        }
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Picks every element (Ctrl+A)."));
     auto row = [&](const char* label, bool enabled, const std::vector<std::pair<const char*, std::function<void()>>>& buttons) {
         const float limit = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
         ImGui::BeginDisabled(!enabled);
@@ -849,11 +1007,11 @@ void Designer::drawInspector() {
     if (tool_ == 0) {
         ImGui::TextDisabled("%s", tr("Click picks. Drag moves."));
         if (ImGui::TreeNode(tr("Mouse and keys"))) {
+            ImGui::TextDisabled("%s", tr("Drag on an empty place picks what the rectangle covers."));
             ImGui::TextDisabled("%s", tr("Ctrl-click adds or removes a pick."));
-            ImGui::TextDisabled("%s", tr("Ctrl-drag picks what the pointer crosses."));
-            ImGui::TextDisabled("%s", tr("Shift-drag moves; on an edge or corner it stretches."));
-            ImGui::TextDisabled("%s", tr("Shift-drag several picked: they move together."));
-            ImGui::TextDisabled("%s", tr("Shift-drag onto another and let go: swap."));
+            ImGui::TextDisabled("%s", tr("Ctrl-drag moves everything picked."));
+            ImGui::TextDisabled("%s", tr("Shift-drag resizes: grab the side or corner of the element, or of the picked group."));
+            ImGui::TextDisabled("%s", tr("Shift-drag from the middle onto another and let go: swap."));
             ImGui::TextDisabled("%s", tr("Alt-drag draws a new element."));
             ImGui::TextDisabled("%s", tr("Delete, Ctrl+D, Ctrl+C / V, arrows, Ctrl+A, Esc."));
             ImGui::TreePop();

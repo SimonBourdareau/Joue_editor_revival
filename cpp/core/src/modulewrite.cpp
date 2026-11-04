@@ -145,8 +145,20 @@ PushReport writeBlankTag(Device& device, TransferClient& client, int slot, const
     return report;
 }
 
+bool looksLikeNewTag(const Bytes& blob) {
+    if (blob.size() < 3 || blob[0] != 0x03) return false;
+    std::size_t length = blob[1];
+    bool emptyRecord = length == 3 && blob.size() > 5 && blob[2] == 0xD0 && blob[3] == 0x00 && blob[4] == 0x00;
+    if (length != 0 && !emptyRecord) return false;
+    std::size_t end = 2 + length;
+    if (blob.size() <= end || blob[end] != 0xFE) return false;
+    return std::all_of(blob.begin() + static_cast<std::ptrdiff_t>(end) + 1, blob.end(), [](std::uint8_t b) { return b == 0; });
+}
+
+bool announcementMayBeNewTag(int type) { return type == 3; }
+
 TagKind classifyTag(const Bytes& blob) {
-    if (blob.size() < InstrumentHeader::Length || blob[0] == 0) return TagKind::Empty;
+    if (blob.size() < InstrumentHeader::Length || blob[0] == 0 || looksLikeNewTag(blob)) return TagKind::Empty;
     const ModuleBindings* bindings = moduleBindings(blob[0]);
     if (!bindings) return TagKind::Unknown;
     try {

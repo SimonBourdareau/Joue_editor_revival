@@ -1,6 +1,7 @@
 #include "joue/designer.hpp"
 #include "joue/i18n.hpp"
 
+#include <cmath>
 #include <algorithm>
 #include <stdexcept>
 
@@ -228,6 +229,27 @@ std::size_t Design::duplicate(std::size_t index) {
     b.y += 4;
     setBox(at, b);
     return at;
+}
+
+bool Design::resizeGroup(const std::vector<std::size_t>& indices, Box from, Box to) {
+    if (indices.empty() || from.w <= 0 || from.h <= 0) return false;
+    if (to.w < 2 || to.h < 2 || to.x < 0 || to.y < 0 || to.x + to.w > widthMm() || to.y + to.h > HeightMm) return false;
+    std::vector<std::pair<std::size_t, Box>> scaled;
+    for (std::size_t index : indices) {
+        if (!hasBox(index)) continue;
+        Box b = box(index);
+        Box n;
+        n.x = to.x + static_cast<int>(std::lround(static_cast<double>(b.x - from.x) * to.w / from.w));
+        n.y = to.y + static_cast<int>(std::lround(static_cast<double>(b.y - from.y) * to.h / from.h));
+        n.w = std::max(2, static_cast<int>(std::lround(static_cast<double>(b.w) * to.w / from.w)));
+        n.h = std::max(2, static_cast<int>(std::lround(static_cast<double>(b.h) * to.h / from.h)));
+        n.x = std::max(0, std::min(n.x, widthMm() - n.w));
+        n.y = std::max(0, std::min(n.y, HeightMm - n.h));
+        scaled.push_back({index, n});
+    }
+    if (scaled.empty()) return false;
+    for (const auto& item : scaled) setBox(item.first, item.second);
+    return true;
 }
 
 Box Design::bounds(const std::vector<std::size_t>& indices) const {

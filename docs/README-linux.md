@@ -9,9 +9,10 @@ An independent editor for the Joué instrument: libraries, the instrument live, 
 ## At a glance
 
 - **Package:** `joue-revival-linux-x86_64.AppImage` and `.tar.gz` (the AppImage was tested here; no Linux machine with an instrument yet), or build from source (below). `joue-editor.sh` builds when needed and starts the program.
-- **Tested:** builds and runs its tests on Ubuntu 24.04 (GCC 13, CMake 3.28). The window and the engine run with a simulated board; **not tested with an instrument**.
+- **Tested:** builds and starts on Ubuntu 24.04 (GCC 13, CMake 3.28). The window and the engine ran with a simulated board; **not tested with an instrument**.
 - **Window system:** X11 (it works under XWayland, not in a pure Wayland session). **MIDI:** ALSA.
-- **Not included:** the manufacturer's factory library; open the one of the original editor.
+- **Presets:** the factory presets are in the `presets` folder and load at the first start.
+- **Not affiliated:** It is not made, endorsed or supported by Joué. Use the editor at your own risk. It does not touch Joué firmware and never will. I do not want to be responsible for bricking the instruments.
 - **Files:** the data folder is `$XDG_DATA_HOME/JoueEditorNG`, or `~/.local/share/JoueEditorNG`.
 
 > [!WARNING]
@@ -25,7 +26,7 @@ Download `joue-revival-linux-x86_64.AppImage`, make it executable (`chmod +x jou
 
 1. **Quit the original Joué Editor.** It holds the instrument's MIDI ports.
 2. Connect the Joué by USB. The **Live instrument** panel at the top says *Connected* and shows the modules.
-3. **File > Open...** and choose the factory library of the original editor (`macos.factoryLibrary.xml` or `editor.factoryLibrary.xml`, from the original application). It is not part of this program.
+3. The factory presets (`presets/factoryLibrary.xml`) load by themselves the first time. **File > Open...** opens another library, and **Save** keeps your own.
 
 ## Build from source
 
@@ -61,4 +62,4 @@ The windows, the files and the troubleshooting are in the [User guide](user-guid
 
 ## Licence and credits
 
-Joué Revival is free software under the **GNU General Public License v3 or later**: see `LICENSE` in the repository. Copyright (C) 2026 Simon Bourdareau. It comes with no warranty. The manufacturer's factory libraries are not part of it and are not covered by its licence. The formats come from reverse engineering the manufacturer's editors and the firmware, and from the official [J-Play](https://github.com/Pjoooo/jplay-opensource) project (GPL-3.0). Dear ImGui, GLFW, pugixml and stb_image are used under their own licences. Independent program: not made, endorsed or supported by Joué.
+Joué Revival is free software under the **GNU General Public License v3 or later**: see `LICENSE` in the repository. Copyright (C) 2026 Simon Bourdareau. It comes with no warranty. The factory presets in `presets/` come from the manufacturer's application: they are included so that the program works at once, and they are not covered by the GPL. The formats come from reverse engineering the manufacturer's editors and the firmware, and from the official [J-Play](https://github.com/Pjoooo/jplay-opensource) project (GPL-3.0). Dear ImGui, GLFW, pugixml and stb_image are used under their own licences. Independent program: not made, endorsed or supported by Joué.

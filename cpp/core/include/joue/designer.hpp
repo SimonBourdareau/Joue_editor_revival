@@ -88,6 +88,7 @@ public:
     void remove(std::size_t index);
 
     // Gestures on several elements at once, as in the editor of BlockPaint.
+    bool resizeGroup(const std::vector<std::size_t>& indices, Box from, Box to);
     Box bounds(const std::vector<std::size_t>& indices) const;  // the smallest box that holds the elements that have a place
     // Move the elements together, keeping their spacing. Nothing moves, and false is returned, when any of them would reach off the surface.
     bool moveGroup(const std::vector<std::size_t>& indices, int dx, int dy);

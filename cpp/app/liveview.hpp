@@ -119,6 +119,7 @@ private:
     std::vector<std::pair<std::string, std::string>> deviceInfo_;  // guarded by mutex_
     bool infoBusy_ = false;  // guarded by mutex_
     double virtualRebaseUntilMs_ = 0;  // after a rescan the board announces its modules again; until then the temporary layout is not judged by them, guarded by mutex_
+    std::array<unsigned, 3> blankStamp_{};  // the insertion of a slot that holds a new tag, which is not a module, has been looked at
     std::array<unsigned, 3> refusedStamp_{};  // the insertion of a slot for which no matching layout could be read has been logged
     void note(const std::string& text);
     std::shared_ptr<const Shown> shown_ = std::make_shared<const Shown>();  // replaced as a whole, so the window only copies a pointer

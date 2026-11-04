@@ -11,11 +11,11 @@ Ce guide couvre la fenêtre principale. Pour dessiner des dispositions, les impr
 - **Au centre : le module.** Son image (cliquez sur un élément pour le modifier) et, pour un préréglage qui convient à un module de l'instrument, le panneau d'envoi.
 - **À droite : Réglages et Affectation MIDI.** Les réglages du module, et ceux de l'élément sur lequel vous avez cliqué.
 
-Menus : **Fichier** (Nouvelle bibliothèque, Ouvrir..., Ouvrir depuis un chemin..., Concepteur de modules..., Enregistrer, Exporter une copie..., Quitter), **Modifier** (Annuler, Rétablir), **Affichage** (Connexion à l'appareil, Informations sur l'appareil, Concepteur de modules, Instrument en direct, Language / Langue, Toucher pour sélectionner, Écouter le port Play), **Aide** (Démarrage rapide, Guide de l'utilisateur, Guide du concepteur de modules, mises à jour).
+Menus : **Fichier** (Nouvelle bibliothèque, Ouvrir..., Ouvrir depuis un chemin..., Ouvrir les préréglages d'usine, Concepteur de modules..., Enregistrer, Exporter une copie..., Quitter), **Modifier** (Annuler, Rétablir), **Affichage** (Informations sur l'appareil, Concepteur de modules, Instrument en direct, Language / Langue, Toucher pour sélectionner, Écouter le port Play), **Aide** (Démarrage rapide, Guide de l'utilisateur, Guide du concepteur de modules, mises à jour).
 
 ## La bibliothèque
 
-Ouvrez la bibliothèque d'usine de l'éditeur d'origine avec **Fichier > Ouvrir...** (elle ne fait pas partie de ce programme). La première fois que vous appuyez sur **Enregistrer**, votre propre `library.xml` est créé dans le dossier de données ; chaque enregistrement garde le fichier précédent dans un dossier `backups`, donc aucune version n'est perdue.
+Les préréglages d'usine (`presets/factoryLibrary.xml`) se chargent tout seuls au premier démarrage du programme ; **Fichier > Ouvrir les préréglages d'usine** les recharge, et **Fichier > Ouvrir...** ouvre un autre fichier de bibliothèque. La première fois que vous appuyez sur **Enregistrer**, votre propre `library.xml` est créé dans le dossier de données ; chaque enregistrement garde le fichier précédent dans un dossier `backups`, donc aucune version n'est perdue.
 
 - **Les préréglages d'usine sont verrouillés** (cadenas). Ils ne peuvent pas être supprimés, et leurs réglages sont grisés. **Déverrouiller pour modifier** en déverrouille un pour cette session ; **Dupliquer** en fait une copie qui est à vous. Play Audio est verrouillé comme les autres, bien que la bibliothèque d'origine le laisse déverrouillé.
 - **Nouveau dossier, Dupliquer, Monter, Descendre, Supprimer** agissent sur l'élément sélectionné. Un dossier qui contient un préréglage verrouillé ne peut pas non plus être supprimé.
@@ -86,7 +86,7 @@ Le dossier de données est `%APPDATA%\JoueEditorNG` sous Windows, `~/Library/App
 
 ## Ligne de commande
 
-`joue_editor [--library FICHIER] [--data DOSSIER] [--select MODULE] [--designer FICHIER] [--scale S] [--safe-graphics] [--no-touches] [--lang en|fr] [--no-update-check]`
+`joue_editor [--library FICHIER] [--data DOSSIER] [--select MODULE] [--designer FICHIER] [--scale S] [--safe-graphics] [--no-touches] [--lang en|fr] [--no-update-check] [--single-window]`
 
 `--scale 1.5` agrandit tout, `--safe-graphics` dessine l'instrument sans textures (pour les anciens pilotes et les machines virtuelles), `--no-touches` démarre sans écouter le port Play, `--designer FICHIER` ouvre le concepteur de modules sur une disposition.
 

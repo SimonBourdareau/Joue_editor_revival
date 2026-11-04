@@ -82,15 +82,15 @@ int main(int argc, char** argv) {
         else if (arg == "--no-touches") options.noTouches = true;
         else if (arg == "--lang") options.language = next();
         else if (arg == "--no-update-check") options.noUpdateCheck = true;
+        else if (arg == "--single-window") options.singleWindow = true;
         else if (arg == "--designer-element") options.designerElement = std::atoi(next());
-        else if (arg == "--panel") options.devicePanel = true;
         else if (arg == "--open-first") options.openFirst = true;
-        else if (arg == "--screenshot") { screenshot = next(); options.noUpdateCheck = true; }
+        else if (arg == "--screenshot") { screenshot = next(); options.noUpdateCheck = true; options.singleWindow = true; }
         else if (arg == "--frames") frames = std::atoi(next());
         else if (arg == "--size") std::sscanf(next(), "%dx%d", &width, &height);
         else if (arg == "--scale") forcedScale = static_cast<float>(std::atof(next()));
         else if (arg == "-h" || arg == "--help") {
-            std::puts("joue_editor [--library FILE] [--data DIR] [--select MODULE] [--panel] [--open-first] [--scale S] [--safe-graphics] [--no-touches] [--lang en|fr] [--screenshot OUT.ppm --frames N --size WxH]");
+            std::puts("joue_editor [--library FILE] [--data DIR] [--select MODULE] [--open-first] [--scale S] [--safe-graphics] [--no-touches] [--lang en|fr] [--single-window] [--screenshot OUT.ppm --frames N --size WxH]");
             return 0;
         }
     }
@@ -158,6 +158,7 @@ int main(int argc, char** argv) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    if (!options.singleWindow) io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     io.IniFilename = nullptr;
     ImGui::StyleColorsDark();
 
@@ -189,6 +190,10 @@ int main(int argc, char** argv) {
     style.WindowRounding = 4.0f;
     style.ItemSpacing = ImVec2(8, 6);
     style.ScaleAllSizes(uiScale);
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    }
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl);
@@ -227,6 +232,12 @@ int main(int argc, char** argv) {
         glClearColor(0.10f, 0.10f, 0.12f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            GLFWwindow* mainContext = glfwGetCurrentContext();
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+            glfwMakeContextCurrent(mainContext);
+        }
         ++frame;
         if (screenshot && frame >= frames) {
             bool ok = saveScreenshot(screenshot, displayWidth, displayHeight);

@@ -74,7 +74,6 @@ std::optional<std::uint32_t> Device::touchHardwareId() { return readU32(6); }
 std::optional<std::uint16_t> Device::firmwareBuild() { return readU16(1); }
 std::optional<std::uint16_t> Device::touchBuild() { return readU16(2); }
 std::optional<Bytes> Device::readModule(int slot) { return transfer_.read(paramName("GET", 11 + checkSlot(slot) - 1)); }
-std::optional<Bytes> Device::readModuleOverview(int slot) { return transfer_.read(paramName("GET", 21 + checkSlot(slot) - 1)); }
 bool Device::writeModule(int slot, const Bytes& blob) { return transfer_.write(paramName("SET", 11 + checkSlot(slot) - 1), blob); }
 bool Device::loadTemporarily(const Bytes& blob) { return transfer_.write(paramName("SET", 42), blob); }
 bool Device::updateModuleList() { return transfer_.write(paramName("CMD", 9), {}); }

@@ -37,6 +37,13 @@ PushReport writeBlankTag(Device& device, TransferClient& client, int slot, const
 // are not those of its factory layout, as a layout drawn in the designer), a manufacturer's (a known type with the records of its factory
 // layout, whatever settings were changed in it), or one that cannot be told (a type this program does not know: it may be a manufacturer's).
 enum class TagKind { Empty, Custom, Manufacturer, Unknown };
+
+// A new NTAG216 is not empty: its first memory page holds the empty NDEF message, the bytes 03 00 FE, and a tag that a phone has formatted may hold an empty
+// record instead, 03 03 D0 00 00 FE; the rest is zero. The board reads that first byte as the type of a module (3, Bubbles). Such a tag is a blank tag.
+// A tag with a real NDEF message on it is not.
+bool looksLikeNewTag(const Bytes& blob);
+// The announcement of a module of type 3 may be that of a new tag; the content of the tag says which.
+bool announcementMayBeNewTag(int type);
 TagKind classifyTag(const Bytes& blob);
 
 // Erases the tag in a slot, but only a tag that holds a custom layout. The layout is read twice and must be the same, and it must be of the type

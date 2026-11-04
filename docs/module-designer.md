@@ -52,21 +52,27 @@ The big picture is the module, seen as in the main window (mirrored). One slot i
 - **Snap** (1, 2, 5 or 10 mm) rounds what you draw and move. **Grid** shows a line every 10 mm and a stronger one at each slot edge.
 - Overlapping elements are allowed (the black keys of a keyboard lie over the white ones). An element on a higher **Layer** is drawn on top and is picked first; the **Check** notes an overlap on the same layer, where a touch may be ambiguous.
 
+## The designer window
+
+The designer is a window of its own. Drag its title bar and it can leave the main window, onto another screen if you have one; dropped over the main window it goes back inside. `--single-window` keeps every window inside the main one.
+
 ## Picking and moving
 
-The tool bar of the inspector has **Select**, **Pad**, **Key**, **Strip**, **String**, **Area**, **Button**. With **Select**, the gestures are those of the BlockPaint editor:
+The tool bar of the inspector has **Select**, **Pad**, **Key**, **Strip**, **String**, **Area**, **Button**. With **Select**, the gestures are:
 
 | Gesture | Effect |
 |---|---|
 | Click | Picks one element; a click on an empty place picks nothing. |
+| Drag on an empty place | Draws a selection rectangle: every element it covers is picked. |
 | Ctrl-click (Cmd on a Mac) | Adds an element to the picking, or takes it out. |
-| Ctrl-drag | Picks every element the pointer crosses. |
+| Ctrl-drag | Moves everything picked, keeping their spacing; the group stops at the edge of the surface as one piece. On an element that is not picked yet, it is picked first. On an empty place, the rectangle adds to the picks instead of replacing them. |
 | Drag | Moves one element. |
-| Shift-drag | Moves; on an edge it stretches that way, on a corner both ways. |
-| Shift-drag, several picked | They move together, keeping their spacing; the group stops at the edge of the surface as one piece. |
-| Shift-drag onto another element, let go | The two trade places, each keeping its size and settings. Only after at least 8 mm of travel; the other one is outlined in green; refused if one would leave the surface. |
+| Shift-drag | Resizes, in any direction. Where you press decides what moves: near a side, that side; near a corner, both sides; in the middle, the element moves instead. With several picked, the press counts on the box around all of them, and every element is scaled with that box. |
+| Shift-drag from the middle onto another element, let go | The two trade places, each keeping its size and settings. Only after at least 8 mm of travel; the other one is outlined in green; refused if one would leave the surface. |
 | Alt-drag | Draws a new element of the last tool used (a pad at first), from where you press to where you let go. |
 | Corner handles | Stretch the element that the inspector shows. |
+
+A side is the outer third of the element (or of the box around the group); the cursor shows what a press would do. Everything picked is outlined in cyan and lightened; with several picked, a box with small squares shows the whole group.
 
 With a tool other than Select, a drag on the surface draws that kind of element; a click gives it a default size.
 
@@ -78,7 +84,7 @@ Keys, when the pointer is over the surface:
 | Ctrl+D | Duplicates everything picked. |
 | Ctrl+C, Ctrl+V | Copy and paste; each paste goes 4 mm further. Elements can be pasted into another layout. |
 | Arrows | Move everything picked by 1 mm (Shift: 10 mm). |
-| Ctrl+A | Picks everything. |
+| Ctrl+A, or the **Select all** button | Picks every element. |
 | Escape | Picks nothing and goes back to Select. |
 
 ## The inspector
@@ -176,6 +182,8 @@ The sheet is a template: lay it over a module, or cut it out and use it as an ov
 
 The program refuses to write if the board reports a module in that slot, if the tag already holds a layout (it reads the tag first: a manufacturer's layout is never written over, and a custom layout has to be erased first), if it finds no tag there, or if the board does not give the full privileges that the first page of a tag needs. After writing, the slot is read back and compared. The module then appears in the live picture, and **Edit** works on it.
 
+**A new NTAG216 is not empty.** From the factory its first page holds the empty NDEF message (`03 00 FE 00`); a tag that a phone has formatted may hold an empty record instead (`03 03 D0 00 00 FE`). The board reads that first byte as the type of a module, so a new tag shows up as *Bubbles*. The program recognises it from what is on the tag, and treats it as blank: the slot shows no module, **Write to a tag...** is allowed, and **Erase a tag...** says it is already blank. In the Detection log the announcement says *Bubbles or a new tag*, and once the tag is read the log says *a new tag, not a module* with the first bytes it read. A tag that holds other data, such as a text written with a phone, is not taken for a new one: blank it with an NFC app first.
+
 ## Erasing a tag
 
 **Erase a tag...** blanks the tag in a slot, **only if it holds a custom layout**. The window says so in red.
@@ -193,9 +201,9 @@ Both windows (**Write to a tag...** and **Erase a tag...**) tell you what is in 
 |---|---|---|---|---|
 | A **manufacturer's module** (Pads, Grand Clavier, Scaler, Grand Fretboard, Play...) | Refused: the board reports a module, and the tag is read first (*holds a manufacturer layout*). | Refused (*holds a manufacturer layout*). | Allowed: only the settings you changed are written; the layout, type and colour stay; the original is saved to a file first and the result is read back. | Writes the saved layout back. |
 | A tag **written from a copy of a factory layout** | Refused, as above. | Refused: counts as a manufacturer's. | Allowed, as above. | Writes the saved layout back. |
-| A **custom tag** (a layout drawn in the designer) | Refused (*already holds a layout, erase it first*). | **Allowed**: red warning, the tag is read twice, its type must be the one the board announced. | Not available: its records are not those of a factory layout, so its settings cannot be shown. | Not applicable. |
-| A tag with a layout of a **type the program does not know** | Refused. | Refused: it may be a manufacturer's. | Not available. | Not applicable. |
-| A **blank** tag | **Allowed**: the tag is detected, the board gives the full privileges, the layout is written and read back. | Nothing to do: *already blank*. | Nothing to edit. | Not applicable. |
+| A **custom tag** (a layout drawn in the designer) | Refused (*already holds a layout, erase it first*). | **Allowed**: red warning, the tag is read twice, its type must be the one the board announced. | **Opens in the module designer** (its records are not those of a factory layout): the original is saved to a file first, and **Save** writes a separate `-edited.bin` file; to put the result on the tag, erase it then write it. | Not applicable. |
+| A tag with a layout of a **type the program does not know** | Refused. | Refused: it may be a manufacturer's. | Opens in the module designer when its layout can be read; otherwise not available. | Not applicable. |
+| A **blank** tag, or a **new** one (it reads as a Pro Bubbles of version 0) | **Allowed**: the tag is detected, the board gives the full privileges, the layout is written and read back. | Nothing to do: *already blank*. | Nothing to edit. | Not applicable. |
 | **No tag** in the slot | Refused (*no tag is detected*). | Refused (*no tag is detected*). | Nothing to edit. | Not applicable. |
 | The board **answers for another slot** (other modules are in the other slots) | Refused when the answer is a layout; take the other modules out and try again. | Refused when the type is not the announced one. | The read of a slot is checked against the announcement. | Checked against the module that was read. |
 

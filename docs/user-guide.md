@@ -11,11 +11,11 @@ This guide covers the main window. For drawing layouts, printing them and writin
 - **Centre: the module.** Its picture (click an element to edit it) and, for a preset that fits a module in the instrument, the upload panel.
 - **Right: Settings and MIDI mapping.** The settings of the module, and those of the element you clicked.
 
-Menus: **File** (New library, Open..., Open from path..., Module designer..., Save, Export a copy..., Quit), **Edit** (Undo, Redo), **View** (Device connection, Device information, Module designer, Live instrument, Language / Langue, Touch to select, Listen to the Play port), **Help** (Quick start, User guide, Module designer guide, updates).
+Menus: **File** (New library, Open..., Open from path..., Open the factory presets, Module designer..., Save, Export a copy..., Quit), **Edit** (Undo, Redo), **View** (Device information, Module designer, Live instrument, Language / Langue, Touch to select, Listen to the Play port), **Help** (Quick start, User guide, Module designer guide, updates).
 
 ## The library
 
-Open the factory library of the original editor with **File > Open...** (it is not part of this program). The first time you press **Save** your own `library.xml` is made in the data folder; every save keeps the previous file in a `backups` folder, so no version is lost.
+The factory presets (`presets/factoryLibrary.xml`) load by themselves the first time the program starts; **File > Open the factory presets** loads them again, and **File > Open...** opens another library file. The first time you press **Save** your own `library.xml` is made in the data folder; every save keeps the previous file in a `backups` folder, so no version is lost.
 
 - **Factory presets are locked** (padlock). They cannot be deleted, and their settings are greyed. **Unlock to edit** unlocks one for this session; **Duplicate** makes a copy that is yours. Play Audio is locked like the others, though the original library leaves it unlocked.
 - **New folder, Duplicate, Up, Down, Delete** work on the selected item. A folder that holds a locked preset cannot be deleted either.
@@ -86,7 +86,7 @@ The data folder is `%APPDATA%\JoueEditorNG` on Windows, `~/Library/Application S
 
 ## Command line
 
-`joue_editor [--library FILE] [--data DIR] [--select MODULE] [--designer FILE] [--scale S] [--safe-graphics] [--no-touches] [--lang en|fr] [--no-update-check]`
+`joue_editor [--library FILE] [--data DIR] [--select MODULE] [--designer FILE] [--scale S] [--safe-graphics] [--no-touches] [--lang en|fr] [--no-update-check] [--single-window]`
 
 `--scale 1.5` makes everything larger, `--safe-graphics` draws the instrument without textures (for old drivers and virtual machines), `--no-touches` starts without listening to the Play port, `--designer FILE` opens the module designer on a layout.
 

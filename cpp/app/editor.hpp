@@ -20,13 +20,13 @@ struct EditorOptions {
     std::string dataDir;
     std::string library;
     std::string select;
-    bool devicePanel = false;
     bool openFirst = false;
     std::string element;  // element to select at start-up (for screenshots)
     bool live = false;  // kept for old command lines: the live instrument is open at start-up anyway
     bool about = false;  // opens the About window at start-up (for screenshots)
     bool noTouches = false;     // does not listen to the Play port
     bool noUpdateCheck = false;  // does not look for a newer version
+    bool singleWindow = false;   // the module designer and the other windows stay inside the main window
     std::string language;       // en or fr: the language of the interface; empty: the one chosen before, else the system's
     bool safeGraphics = false;  // old OpenGL, no vertical sync, and the device drawn without a texture
     int designerElement = -1;  // element of the designer to select at start-up
@@ -51,12 +51,6 @@ public:
     void askQuit() { quitRequested_ = true; }
 
 private:
-    struct JobResult {
-        std::vector<std::string> lines;
-        std::vector<joue::PortPair> pairs;
-        int defaultPair = -1;
-    };
-
     // library state
     void loadRoot(std::unique_ptr<joue::Node> root, const std::string& message);
     void openFromPath(const std::string& path);
@@ -84,14 +78,11 @@ private:
     bool anyVisibleSetting(joue::Node& array, const std::vector<joue::SettingMeta>* meta, const std::string& parentValue);
     void drawSettings(joue::Node& array, bool locked, const std::vector<joue::SettingMeta>* meta, const std::string& parentValue);
     void drawValue(joue::Node& setting, bool locked, const joue::SettingMeta* meta);
-    void drawDevicePanel();
     void drawLeftOfModule(joue::Node& module, bool locked, float width);
     void drawRightOfModule(joue::Node& module, bool locked);
     bool ruleFlags(const std::string& settingName, bool& hidden, bool& disabled);
     void drawPopups();
     bool editText(const char* id, std::string& value, bool disabled, float width = 0);
-    void startJob(std::function<JobResult()> work);
-    void pollJob();
 
     // library actions
     void newFolder();
@@ -121,7 +112,6 @@ private:
     std::optional<State> pending_;
     bool changedThisFrame_ = false;
 
-    bool showDevice_ = false;
     void drawDeviceInfoWindow();
     void drawComparePopup();
     void drawHelp();
@@ -136,12 +126,6 @@ private:
     UpdateCheck update_;
     std::string updateTag_, updateUrl_;
     long long lastUpdateCheck_ = 0;
-    std::future<JobResult> job_;
-    std::vector<joue::PortPair> pairs_;
-    int pairIndex_ = 0;
-    int slot_ = 1;
-    std::string output_ = "Nothing read yet.";
-    std::string hexInput_;
 
     bool openPathPopup_ = false, deletePopup_ = false, quitPopup_ = false, exportPopup_ = false, aboutPopup_ = false;
     Texture logo_;  // the logo of the program, made when it is first drawn

@@ -448,10 +448,25 @@ std::optional<std::string> chooseSaveFile() {
 
 }  // namespace
 
+std::string findPresets() {
+    std::string base = executableDirectory();
+    const char* relatives[] = {"/presets", "/../Resources/presets", "/../share/joue-revival/presets", "/../presets", "/../../presets", "/../../../presets"};
+    for (const char* relative : relatives) {
+        fs::path candidate = fs::path(base + relative) / "factoryLibrary.xml";
+        std::error_code ec;
+        if (fs::exists(candidate, ec)) return fs::weakly_canonical(candidate, ec).string();
+    }
+    for (const char* directory : {"presets", "."}) {
+        std::error_code ec;
+        fs::path candidate = fs::path(directory) / "factoryLibrary.xml";
+        if (fs::exists(candidate, ec)) return fs::absolute(candidate, ec).string();
+    }
+    return {};
+}
+
 Editor::Editor(EditorOptions options) : options_(std::move(options)) {
     fs::create_directories(options_.dataDir);
     libraryPath_ = (fs::path(options_.dataDir) / "library.xml").string();
-    showDevice_ = options_.devicePanel;
     pendingElement_ = options_.element;
     if (dialogsAvailable()) {
         designer_.chooseOpen = [] { return chooseOpenFile(); };
@@ -491,6 +506,15 @@ Editor::Editor(EditorOptions options) : options_(std::move(options)) {
             loadRoot(joue::parseLibrary(readFile(libraryPath_)), "Loaded your saved library.");
         } catch (const std::exception& error) {
             setStatus(std::string(libraryPath_) + " could not be read: " + error.what(), true);
+        }
+    } else {
+        std::string presets = findPresets();
+        if (!presets.empty()) {
+            try {
+                loadRoot(joue::parseLibrary(readFile(presets)), "Factory presets loaded. Save keeps them, with your changes, in your own library.");
+            } catch (const std::exception& error) {
+                setStatus(presets + " could not be read: " + error.what(), true);
+            }
         }
     }
     if (root_ && !options_.select.empty()) {
@@ -753,7 +777,6 @@ bool Editor::editText(const char* id, std::string& value, bool disabled, float w
 }
 
 void Editor::draw() {
-    pollJob();
     applyTouchSelection();
     pollUpdateCheck();
     if (ImGui::IsKeyPressed(ImGuiKey_F1, false)) helpOpen_ = true;
@@ -766,6 +789,7 @@ void Editor::draw() {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
+    ImGui::SetNextWindowViewport(viewport->ID);
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoBringToFrontOnFocus;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::Begin(tr("root"), nullptr, flags);
@@ -800,7 +824,6 @@ void Editor::draw() {
         list->AddRectFilled(ImVec2(cx - 36.0f * uiScale, cy - 2.0f * uiScale), ImVec2(cx + 36.0f * uiScale, cy + 2.0f * uiScale), grip, 2.0f * uiScale);
         for (int k = -2; k <= 2; ++k) list->AddCircleFilled(ImVec2(cx + k * 9.0f * uiScale, cy), 1.1f * uiScale, IM_COL32(20, 20, 24, 255));
     }
-    float deviceWidth = showDevice_ ? 420.0f * (ImGui::GetFontSize() / 15.0f) : 0.0f;
     // one column: the buttons on top, which do not scroll, and under them the list, which does
     ImGui::BeginChild("treecolumn", ImVec2(340.0f * (ImGui::GetFontSize() / 15.0f), -footer), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     drawTreeToolbar();
@@ -809,15 +832,9 @@ void Editor::draw() {
     ImGui::EndChild();
     ImGui::EndChild();
     ImGui::SameLine();
-    ImGui::BeginChild("content", ImVec2(showDevice_ ? -(deviceWidth + ImGui::GetStyle().ItemSpacing.x) : 0.0f, -footer), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("content", ImVec2(0.0f, -footer), ImGuiChildFlags_Borders);
     drawContent();
     ImGui::EndChild();
-    if (showDevice_) {
-        ImGui::SameLine();
-        ImGui::BeginChild("device", ImVec2(0, -footer), ImGuiChildFlags_Borders);
-        drawDevicePanel();
-        ImGui::EndChild();
-    }
 
     {
         // the message at the left, clipped so that it never runs under the version, which is at the right
@@ -880,6 +897,15 @@ void Editor::openModuleFromInstrument(int slot, const joue::Bytes& blob) {
     if (backup.empty()) {
         setStatus("The layout of the module could not be saved, so it is not opened.", true);
         return;
+    }
+    if (!bindings || !joue::structureMatches(*bindings, blob)) {
+        std::string edited = backup;
+        std::size_t at = edited.rfind("-original.bin");
+        if (at != std::string::npos) edited.replace(at, 13, "-edited.bin");
+        if (designer_.openBlob(blob, edited, "the layout of slot " + std::to_string(slot))) {
+            setStatus("Slot " + std::to_string(slot) + ": opened in the module designer, as a custom layout. The original is saved as " + backup + "; Save writes " + edited + ".");
+            return;
+        }
     }
     if (!bindings) {
         setStatus("The settings of " + typeName + " modules cannot be read from a module yet. Its layout is saved as " + backup + ".", true);
@@ -1366,7 +1392,7 @@ void Editor::drawHelp() {
     }
     const char* steps[6] = {tr("Quit the original Joué Editor: it holds the instrument's MIDI ports."),
                             tr("Connect the Joué by USB. The Live instrument panel says Connected and shows the modules."),
-                            tr("File > Open...: choose the factory library of the original editor. It is not part of this program."),
+                            tr("The factory presets load by themselves the first time. File > Open... opens another library, and Save keeps your own."),
                             tr("Click a preset on the left, then an element in its picture: its settings are on the right."),
                             tr("Edit opens a module of the instrument as a copy; Upload to Joué writes only what you changed."),
                             tr("File > Module designer draws new layouts: print them, try them, write them to a blank tag.")};
@@ -1516,6 +1542,11 @@ void Editor::drawMenuBar() {
             }
         }
         if (ImGui::MenuItem(tr("Open from path..."))) openPathPopup_ = true;
+        if (ImGui::MenuItem(tr("Open the factory presets"))) {
+            std::string presets = findPresets();
+            if (presets.empty()) setStatus("The factory presets were not found next to the program.", true);
+            else openFromPath(presets);
+        }
         ImGui::Separator();
         if (ImGui::MenuItem(tr("Module designer..."))) designer_.open = true;
         if (ImGui::MenuItem(tr("Live instrument"), nullptr, &live_.open)) {}
@@ -1538,7 +1569,6 @@ void Editor::drawMenuBar() {
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu(tr("View"))) {
-        ImGui::MenuItem(tr("Device connection"), nullptr, &showDevice_);
         if (ImGui::MenuItem(tr("Device information..."))) {
             deviceInfoOpen_ = true;
             live_.requestDeviceInfo();
@@ -2149,121 +2179,6 @@ void Editor::drawValue(Node& setting, bool locked, const joue::SettingMeta* meta
         }
     }
     endGrey();
-}
-
-// ---- device connection panel (reading only)
-
-void Editor::startJob(std::function<JobResult()> work) {
-    job_ = std::async(std::launch::async, [work = std::move(work)]() {
-        try {
-            return work();
-        } catch (const std::exception& error) {
-            JobResult failed;
-            failed.lines = {std::string("Error: ") + error.what()};
-            return failed;
-        }
-    });
-}
-
-void Editor::pollJob() {
-    if (!job_.valid() || job_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
-    JobResult result = job_.get();
-    if (!result.pairs.empty() || result.defaultPair >= 0) {
-        pairs_ = result.pairs;
-        pairIndex_ = std::max(result.defaultPair, 0);
-    }
-    std::string text;
-    for (const auto& line : result.lines) text += line + "\n";
-    output_ = text;
-}
-
-void Editor::drawDevicePanel() {
-    ImGui::SeparatorText(tr("Device connection"));
-    ImGui::TextDisabled("%s", tr("Reading only. Quit the original editor first."));
-    bool busy = job_.valid() && job_.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
-    beginGrey(busy);
-    if (ImGui::Button(tr("Find Joue"))) {
-        startJob([] {
-            JobResult result;
-            auto endpoints = joue::listEndpoints();
-            result.pairs = joue::findPairs(endpoints);
-            result.defaultPair = joue::chooseEditorPair(result.pairs);
-            result.lines.push_back(result.pairs.empty() ? "No Joue found." : "Found " + std::to_string(result.pairs.size()) + " port pair(s).");
-            for (const auto& e : endpoints) result.lines.push_back(std::string(joue::looksLikeJoue(e) ? "* " : "  ") + (e.isSource ? "source #" : "destination #") + std::to_string(e.index) + " " + e.displayName);
-            return result;
-        });
-    }
-    if (!pairs_.empty()) {
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(-1);
-        std::string preview = pairs_[static_cast<std::size_t>(std::min<int>(pairIndex_, static_cast<int>(pairs_.size()) - 1))].text();
-        if (ImGui::BeginCombo(tr("##pair"), preview.c_str())) {
-            for (std::size_t i = 0; i < pairs_.size(); ++i) {
-                if (ImGui::Selectable(pairs_[i].text().c_str(), static_cast<int>(i) == pairIndex_)) pairIndex_ = static_cast<int>(i);
-            }
-            ImGui::EndCombo();
-        }
-    }
-    bool havePair = !pairs_.empty();
-    beginGrey(!havePair);
-    if (ImGui::Button(tr("Read info")) && havePair) {
-        joue::PortPair pair = pairs_[static_cast<std::size_t>(pairIndex_)];
-        startJob([pair] {
-            JobResult result;
-            auto port = joue::openPort(pair);
-            joue::TransferClient transfer(*port);
-            joue::Device device(transfer);
-            auto row = [&](const std::string& label, const std::optional<joue::Bytes>& data) { result.lines.push_back(label + ": " + (data ? joue::toHex(*data) : "no answer")); };
-            auto number = [&](const std::string& label, std::optional<std::uint32_t> v) { result.lines.push_back(label + ": " + (v ? std::to_string(*v) : "no answer")); };
-            row("serial", device.serial());
-            number("firmware version", device.firmwareVersion());
-            if (auto build = device.firmwareBuild()) result.lines.push_back("firmware build: " + std::to_string(*build)); else result.lines.push_back("firmware build: no answer");
-            number("hardware id", device.hardwareId());
-            number("touch version", device.touchVersion());
-            for (int slot = 1; slot <= joue::SlotCount; ++slot) row("slot " + std::to_string(slot) + " overview", device.readModuleOverview(slot));
-            return result;
-        });
-    }
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(90);
-    ImGui::SliderInt(tr("##slot"), &slot_, 1, joue::SlotCount, "Slot %d");
-    ImGui::SameLine();
-    if (ImGui::Button(tr("Read slot")) && havePair) {
-        joue::PortPair pair = pairs_[static_cast<std::size_t>(pairIndex_)];
-        int slot = slot_;
-        startJob([pair, slot] {
-            JobResult result;
-            auto port = joue::openPort(pair);
-            joue::TransferClient transfer(*port);
-            joue::Device device(transfer);
-            auto data = device.readModule(slot);
-            if (!data) {
-                result.lines.push_back("No answer for slot " + std::to_string(slot) + ".");
-                return result;
-            }
-            result.lines.push_back("Received " + std::to_string(data->size()) + " bytes for slot " + std::to_string(slot) + ".");
-            for (auto& line : joue::describe(*data)) result.lines.push_back(line);
-            result.lines.push_back("");
-            result.lines.push_back("raw: " + joue::toHex(*data));
-            return result;
-        });
-    }
-    endGrey();
-    endGrey();
-    if (busy) ImGui::TextDisabled("%s", tr("Working..."));
-    ImGui::InputTextMultiline("##output", &output_, ImVec2(-1, 260), ImGuiInputTextFlags_ReadOnly);
-
-    ImGui::SeparatorText(tr("Decode bytes"));
-    ImGui::InputTextMultiline("##hex", &hexInput_, ImVec2(-1, 70));
-    if (ImGui::Button(tr("Decode"))) {
-        try {
-            std::string text;
-            for (auto& line : joue::describe(joue::parseHex(hexInput_))) text += line + "\n";
-            output_ = text;
-        } catch (const std::exception& error) {
-            output_ = std::string("Error: ") + error.what();
-        }
-    }
 }
 
 void Editor::drawPopups() {

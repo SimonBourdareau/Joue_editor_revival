@@ -32,7 +32,6 @@ public:
     std::optional<std::uint16_t> firmwareBuild();
     std::optional<std::uint16_t> touchBuild();
     std::optional<Bytes> readModule(int slot);
-    std::optional<Bytes> readModuleOverview(int slot);
     bool writeModule(int slot, const Bytes& blob);
     // The "update slot" request of the official J-Play application: the board builds the instrument of a slot from the blob without
     // touching any tag, so nothing is written to a module and nothing has to be on the device. The slot is not named in the request: it is

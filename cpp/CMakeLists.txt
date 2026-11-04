@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(joue_editor_ng VERSION 0.37.0 LANGUAGES CXX)
+project(joue_editor_ng VERSION 0.40.0 LANGUAGES CXX)
 # the version shown in the program and in the About window comes from here
 add_compile_definitions(JOUE_VERSION="${PROJECT_VERSION}")
 if(WIN32)
@@ -21,7 +21,7 @@ endif()
 include(FetchContent)
 FetchContent_Declare(pugixml GIT_REPOSITORY https://github.com/zeux/pugixml.git GIT_TAG v1.14 GIT_SHALLOW TRUE)
 FetchContent_Declare(glfw GIT_REPOSITORY https://github.com/glfw/glfw.git GIT_TAG 3.4 GIT_SHALLOW TRUE)
-FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG v1.91.9 GIT_SHALLOW TRUE)
+FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG v1.91.9-docking GIT_SHALLOW TRUE)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)

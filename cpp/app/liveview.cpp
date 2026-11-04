@@ -31,6 +31,17 @@ void dim(const std::string& text) {
     ImGui::PopStyleColor();
 }
 
+std::string hexHead(const joue::Bytes& bytes, std::size_t count = 8) {
+    static const char* digits = "0123456789ABCDEF";
+    std::string out;
+    for (std::size_t i = 0; i < bytes.size() && i < count; ++i) {
+        if (i) out += ' ';
+        out += digits[bytes[i] >> 4];
+        out += digits[bytes[i] & 15];
+    }
+    return out;
+}
+
 std::string describeMessage(const joue::Bytes& m) {
     if (m.size() < 2) return "";
     int channel = (m[0] & 0x0F) + 1;
@@ -342,7 +353,7 @@ bool LiveView::connect(std::string& error) {
                     std::lock_guard<std::mutex> lock(mutex_);
                     announced_.apply(*event);
                 }
-                note("the board announced slot " + std::to_string(event->slot) + ": " + (event->inserted ? joue::moduleName(event->type) + " (type " + std::to_string(event->type) + ", version " + std::to_string(event->version) + ", colour " + std::to_string(event->color) + ")" : std::string("module removed")));
+                note("the board announced slot " + std::to_string(event->slot) + ": " + (event->inserted ? joue::moduleName(event->type) + (joue::announcementMayBeNewTag(event->type) ? std::string(" or a new tag") : std::string()) + " (type " + std::to_string(event->type) + ", version " + std::to_string(event->version) + ", colour " + std::to_string(event->color) + ")" : std::string("module removed")));
             }
             scanNow_ = true;
         });
@@ -443,21 +454,28 @@ void LiveView::scanOnce(bool urgent) {
                 }
                 continue;
             }
-            if (blobs_[i].empty() || blobStamp_[i] != announced.stamp(slot)) {
+            if ((blobs_[i].empty() || blobStamp_[i] != announced.stamp(slot)) && blankStamp_[i] != announced.stamp(slot)) {
                 blobs_[i].clear();
                 client_->setTimeout(std::chrono::milliseconds(2500));
                 joue::ModuleEvent event = announced.event(slot);
                 // a read of a slot can hand back the module of another one: what is kept for a slot must be the type of
                 // module the board announced there, and a read that is not is made again
+                std::string head = "nothing read";
                 for (int attempt = 0; attempt < 3 && blobs_[i].empty(); ++attempt) {
                     auto blob = device_->readModule(slot);
+                    if (blob && !blob->empty()) head = hexHead(*blob);
+                    if (blob && joue::looksLikeNewTag(*blob) && joue::announcementMayBeNewTag(event.type)) {
+                        blankStamp_[i] = announced.stamp(slot);
+                        note("slot " + std::to_string(slot) + ": a new tag, not a module (first bytes " + hexHead(*blob) + ": the empty NDEF message of a new NTAG, which the board reads as Bubbles)");
+                        break;
+                    }
                     if (blob && blob->size() >= joue::InstrumentHeader::Length) {
                         try {
                             joue::ModuleBlob::parse(*blob);
                             if (joue::blobFitsAnnouncement(*blob, event)) {
                                 blobs_[i] = *blob;
                                 blobStamp_[i] = announced.stamp(slot);
-                                note("slot " + std::to_string(slot) + ": layout read, " + joue::moduleName(event.type) + ", " + std::to_string(blob->size()) + " bytes");
+                                note("slot " + std::to_string(slot) + ": layout read, " + joue::moduleName(event.type) + ", " + std::to_string(blob->size()) + " bytes" + (joue::announcementMayBeNewTag(event.type) ? ", first bytes " + hexHead(*blob) : std::string()));
                             } else {
                                 note("slot " + std::to_string(slot) + ": a read gave a " + joue::moduleName((*blob)[0]) + " but the board announced a " + joue::moduleName(event.type) + "; it was not kept");
                             }
@@ -466,9 +484,9 @@ void LiveView::scanOnce(bool urgent) {
                     }
                     if (blobs_[i].empty() && attempt < 2) std::this_thread::sleep_for(std::chrono::milliseconds(300));
                 }
-                if (blobs_[i].empty() && refusedStamp_[i] != announced.stamp(slot)) {
+                if (blobs_[i].empty() && blankStamp_[i] != announced.stamp(slot) && refusedStamp_[i] != announced.stamp(slot)) {
                     refusedStamp_[i] = announced.stamp(slot);
-                    note("slot " + std::to_string(slot) + ": no layout that fits the announcement could be read; the module is not shown (try Rescan modules)");
+                    note("slot " + std::to_string(slot) + ": no layout that fits the announcement could be read (first bytes " + head + "); the module is not shown (try Rescan modules)");
                 }
             }
             if (!blobs_[i].empty()) slots[i] = {true, blobs_[i]};
@@ -628,7 +646,8 @@ void LiveView::workerMain() {
                     std::string value = "empty";
                     if (announced_.present(slot)) {
                         joue::ModuleEvent e = announced_.event(slot);
-                        value = joue::moduleName(e.type) + " (type " + std::to_string(e.type) + ", version " + std::to_string(e.version) + ", colour " + std::to_string(e.color) + ")";
+                        if (joue::announcementMayBeNewTag(e.type) && blankStamp_[static_cast<std::size_t>(slot - 1)] == announced_.stamp(slot)) value = "new tag (not a module)";
+                        else value = joue::moduleName(e.type) + " (type " + std::to_string(e.type) + ", version " + std::to_string(e.version) + ", colour " + std::to_string(e.color) + ")";
                     }
                     all.push_back({"Module in slot " + std::to_string(slot), value});
                 }
@@ -646,7 +665,7 @@ void LiveView::workerMain() {
                 tagJob_.reset();
                 pushing_ = true;
                 pushStatus_ = std::string(tag->erase ? "Erasing" : "Writing") + " the tag in slot " + std::to_string(tag->slot) + "...";
-                slotHoldsModule = announced_.present(tag->slot) && announced_.event(tag->slot).type != 0;
+                slotHoldsModule = announced_.present(tag->slot) && announced_.event(tag->slot).type != 0 && !joue::announcementMayBeNewTag(announced_.event(tag->slot).type);
                 announcedType = announced_.present(tag->slot) ? announced_.event(tag->slot).type : -1;
             }
         }

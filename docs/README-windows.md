@@ -8,9 +8,10 @@ An independent editor for the Joué instrument: libraries, the instrument live, 
 
 ## At a glance
 
-- **Package:** `JoueRevival.exe` (64-bit, no installer, no extra DLLs), `JoueRevival-safe-graphics.bat`, this README, `user-guide.md`, `module-designer.md` and their French versions `README.fr.md`, `user-guide.fr.md`, `module-designer.fr.md` (in the repository these documents are in the `docs` folder).
+- **Package:** `JoueRevival.exe` (64-bit, no extra DLLs; there is also a setup program), `JoueRevival-safe-graphics.bat`, this README, `user-guide.md`, `module-designer.md` and their French versions `README.fr.md`, `user-guide.fr.md`, `module-designer.fr.md` (in the repository these documents are in the `docs` folder).
 - **Tested:** used by its author on Windows 11 with a Joué Pro. The executable is cross-compiled with MinGW-w64 and also runs under Wine.
-- **Not included:** the manufacturer's factory library; open the one of the original editor (`editor.factoryLibrary.xml`).
+- **Presets:** the factory presets are in the `presets` folder and load at the first start.
+- **Not affiliated:** It is not made, endorsed or supported by Joué. Use the editor at your own risk. It does not touch Joué firmware and never will. I do not want to be responsible for bricking the instruments.
 - **Files:** the data folder is `%APPDATA%\JoueEditorNG`.
 
 > [!WARNING]
@@ -30,7 +31,7 @@ To remove the program, delete the folder, and `%APPDATA%\JoueEditorNG` if you wa
 
 1. **Quit the original Joué Editor.** It holds the instrument's MIDI ports.
 2. Connect the Joué by USB. The **Live instrument** panel at the top says *Connected* and shows the modules.
-3. **File > Open...** and choose the factory library of the original editor (`editor.factoryLibrary.xml`). It is not part of this program.
+3. The factory presets (`presets/factoryLibrary.xml`) load by themselves the first time. **File > Open...** opens another library, and **Save** keeps your own.
 
 On Windows 11 several programs can listen to the instrument's MIDI ports at once. On older systems the first program to open a port keeps it; if another program loses the notes, switch off **View > Listen to the Play port (touches)**.
 
@@ -78,4 +79,4 @@ build\Release\joue_editor.exe
 
 ## Licence and credits
 
-Joué Revival is free software under the **GNU General Public License v3 or later**: see `LICENSE` in the repository. Copyright (C) 2026 Simon Bourdareau. It comes with no warranty. The manufacturer's factory libraries are not part of it and are not covered by its licence. The formats come from reverse engineering the manufacturer's editors and the firmware, and from the official [J-Play](https://github.com/Pjoooo/jplay-opensource) project (GPL-3.0). Dear ImGui, GLFW, pugixml and stb_image are used under their own licences. Independent program: not made, endorsed or supported by Joué.
+Joué Revival is free software under the **GNU General Public License v3 or later**: see `LICENSE` in the repository. Copyright (C) 2026 Simon Bourdareau. It comes with no warranty. The factory presets in `presets/` come from the manufacturer's application: they are included so that the program works at once, and they are not covered by the GPL. The formats come from reverse engineering the manufacturer's editors and the firmware, and from the official [J-Play](https://github.com/Pjoooo/jplay-opensource) project (GPL-3.0). Dear ImGui, GLFW, pugixml and stb_image are used under their own licences. Independent program: not made, endorsed or supported by Joué.

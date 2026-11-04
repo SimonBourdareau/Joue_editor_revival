@@ -7,6 +7,7 @@
 | `cpp/core` | The engine: SysEx and file transfer, the device, module blobs and the designer's `Design`, library XML, the PDF writer, the MIDI backends (CoreMIDI, winmm, ALSA), the French texts (`i18n_fr.inc`), and the tables measured from the manufacturer's applications (`bindings_data.inc`, `settings_data.inc`, `moduleart_data.inc`). |
 | `cpp/app` | The Dear ImGui editor: the main window, the live instrument, the module designer, the pictures of the modules (`device_pictures.inc`, `logo.inc`), the icons. |
 | `cpp/third_party` | `stb_image.h`. |
+| `presets` | `factoryLibrary.xml`, the factory presets of the manufacturer's application, which the program loads at its first start (and a note on where they come from). |
 | `docs` | The READMEs and the two guides, in English and in French, and the pictures they use. |
 | `packaging` | What the release workflow uses: the packages, the AppImage, the Windows installer (`joue-revival.iss`), the disk image, the macOS notarization, the version check and the release notes. |
 | `.github/workflows` | `build.yml` and `release.yml`. |
@@ -66,7 +67,7 @@ git tag v0.37.0 && git push origin v0.37.0
 
 **Dry run:** Actions > Release > *Run workflow*, with "publish" left off, does everything except the publication; the packages can be downloaded from the run.
 
-The two workflows **have not run on GitHub yet**, and the Windows installer, the disk image and the notarization could not be tried here: the first real run may need small fixes (runner labels, action versions, the Inno Setup path). The AppImage was built and started on Linux. The factory libraries of the manufacturer are never in a release.
+The two workflows **have not run on GitHub yet**, and the Windows installer, the disk image and the notarization could not be tried here: the first real run may need small fixes (runner labels, action versions, the Inno Setup path). The AppImage was built and started on Linux. The presets are in every package: in a `presets` folder next to the program, and inside the app on macOS.
 
 `packaging/package-release.sh linux|windows|macos BUILD_DIR OUT_DIR` makes the same package by hand from any finished build; the macOS app is signed ad hoc (`codesign`, or `rcodesign` on Linux).
 
@@ -76,4 +77,4 @@ One delivered version is one commit, tagged `vX.Y.Z`; no version is ever lost. T
 
 ## Licence
 
-GNU GPL v3 or later (`LICENSE`). A contribution is accepted under the same licence. The manufacturer's data (its factory libraries) are not covered by it and are never added to the repository.
+GNU GPL v3 or later (`LICENSE`). A contribution is accepted under the same licence. The factory presets in `presets/` come from the manufacturer's application and are not covered by it.

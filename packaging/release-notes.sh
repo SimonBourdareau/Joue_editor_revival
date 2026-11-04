@@ -20,7 +20,7 @@ Free software under the GNU GPL v3 or later. Each package has the README and the
 | `joue-revival-linux-x86_64.AppImage`, `.tar.gz` | Linux, 64-bit, on X11 or XWayland |
 | `joue-revival-*-source.zip` | the source of this version |
 
-The factory libraries of the manufacturer are not part of any package: open the one that comes with the original Joué Editor.
+The factory presets are in every package and load at the first start.
 `SHA256SUMS.txt` has the checksum of every file.
 
 ## Changes

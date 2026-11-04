@@ -4,7 +4,7 @@
 
 Le concepteur de modules dessine la disposition d'un module : où sont ses pads, touches, bandes, cordes et zones, et ce que chacun envoie. Une disposition est un petit fichier binaire (un *blob de module*, de 888 octets au plus) du genre de celui qui se trouve sur la puce d'un module. Ce guide couvre son dessin, et ce que vous pouvez en faire : l'imprimer à la taille réelle, l'essayer sur l'instrument sans aucune puce, l'écrire sur une puce vierge, effacer une puce.
 
-![Le concepteur de modules avec une disposition de pads, de touches, d'une bande et d'une zone](designer-preview.png)
+![Le concepteur de modules avec une disposition de pads, de touches, d'une bande et d'une zone](designer-preview-fr.png)
 
 Ouvrez-le avec **Fichier > Concepteur de modules...** (ou **Affichage > Concepteur de modules**), ou lancez le programme avec `--designer FICHIER`.
 
@@ -52,21 +52,27 @@ La grande image est le module, vu comme dans la fenêtre principale (en miroir).
 - **Magnétisme** (1, 2, 5 ou 10 mm) arrondit ce que vous dessinez et déplacez. **Grille** montre un trait tous les 10 mm et un plus marqué au bord de chaque emplacement.
 - Les éléments qui se chevauchent sont permis (les touches noires d'un clavier sont posées sur les blanches). Un élément sur un **Calque** plus haut est dessiné dessus et est sélectionné en premier ; la **Vérification** signale un chevauchement sur le même calque, où un toucher peut être ambigu.
 
+## La fenêtre du concepteur
+
+Le concepteur est une fenêtre à part. Faites glisser sa barre de titre : elle peut sortir de la fenêtre principale, vers un autre écran si vous en avez un ; déposée sur la fenêtre principale, elle y rentre de nouveau. `--single-window` garde toutes les fenêtres à l'intérieur de la fenêtre principale.
+
 ## Sélectionner et déplacer
 
-La barre d'outils de l'inspecteur a **Sélectionner**, **Pad**, **Touche**, **Bande**, **Corde**, **Zone**, **Bouton**. Avec **Sélectionner**, les gestes sont ceux de l'éditeur BlockPaint :
+La barre d'outils de l'inspecteur a **Sélectionner**, **Pad**, **Touche**, **Bande**, **Corde**, **Zone**, **Bouton**. Avec **Sélectionner**, les gestes sont :
 
 | Geste | Effet |
 |---|---|
 | Clic | Sélectionne un élément ; un clic sur un endroit vide ne sélectionne rien. |
+| Glisser sur un endroit vide | Trace un rectangle de sélection : chaque élément qu'il couvre est sélectionné. |
 | Ctrl + clic (Cmd sur Mac) | Ajoute un élément à la sélection, ou le retire. |
-| Ctrl + glisser | Sélectionne chaque élément que le pointeur traverse. |
+| Ctrl + glisser | Déplace tout ce qui est sélectionné, en gardant leur écartement ; le groupe s'arrête au bord de la surface d'un seul bloc. Sur un élément pas encore sélectionné, il est d'abord sélectionné. Sur un endroit vide, le rectangle s'ajoute à la sélection au lieu de la remplacer. |
 | Glisser | Déplace un élément. |
-| Maj + glisser | Déplace ; sur un bord il étire dans ce sens, sur un coin dans les deux. |
-| Maj + glisser, plusieurs sélectionnés | Ils se déplacent ensemble, en gardant leur écartement ; le groupe s'arrête au bord de la surface d'un seul bloc. |
-| Maj + glisser sur un autre élément, relâcher | Les deux échangent leurs places, chacun gardant sa taille et ses réglages. Seulement après au moins 8 mm de déplacement ; l'autre est entouré en vert ; refusé si l'un sortait de la surface. |
+| Maj + glisser | Redimensionne, dans toutes les directions. L'endroit où vous appuyez décide de ce qui bouge : près d'un côté, ce côté ; près d'un coin, les deux côtés ; au milieu, l'élément se déplace à la place. Avec plusieurs éléments sélectionnés, l'appui compte sur la boîte qui les entoure tous, et chaque élément est mis à l'échelle avec cette boîte. |
+| Maj + glisser depuis le milieu sur un autre élément, relâcher | Les deux échangent leurs places, chacun gardant sa taille et ses réglages. Seulement après au moins 8 mm de déplacement ; l'autre est entouré en vert ; refusé si l'un sortait de la surface. |
 | Alt + glisser | Dessine un nouvel élément du dernier outil utilisé (un pad au début), de l'endroit où vous appuyez à celui où vous relâchez. |
 | Poignées de coin | Étirent l'élément que montre l'inspecteur. |
+
+Un côté est le tiers extérieur de l'élément (ou de la boîte autour du groupe) ; le curseur montre ce que ferait un appui. Tout ce qui est sélectionné est entouré de cyan et éclairci ; avec plusieurs éléments sélectionnés, une boîte avec de petits carrés montre le groupe entier.
 
 Avec un outil autre que Sélectionner, un glissement sur la surface dessine cette sorte d'élément ; un clic lui donne une taille par défaut.
 
@@ -78,7 +84,7 @@ Touches, quand le pointeur est sur la surface :
 | Ctrl+D | Duplique tout ce qui est sélectionné. |
 | Ctrl+C, Ctrl+V | Copier et coller ; chaque collage va 4 mm plus loin. Les éléments peuvent être collés dans une autre disposition. |
 | Flèches | Déplacent tout ce qui est sélectionné de 1 mm (Maj : 10 mm). |
-| Ctrl+A | Sélectionne tout. |
+| Ctrl+A, ou le bouton **Tout sélectionner** | Sélectionne tous les éléments. |
 | Échap | Ne sélectionne rien et revient à Sélectionner. |
 
 ## L'inspecteur
@@ -176,6 +182,8 @@ La feuille est un gabarit : posez-la sur un module, ou découpez-la et utilisez-
 
 Le programme refuse d'écrire si la carte signale un module dans cet emplacement, si la puce contient déjà une disposition (il lit d'abord la puce : une disposition du fabricant n'est jamais écrasée, et une disposition personnalisée doit être effacée d'abord), s'il n'y trouve aucune puce, ou si la carte ne donne pas les pleins pouvoirs qu'il faut pour la première page d'une puce. Après l'écriture, l'emplacement est relu et comparé. Le module apparaît alors dans l'image en direct, et **Modifier** fonctionne dessus.
 
+**Une NTAG216 neuve n'est pas vide.** Dès l'usine sa première page contient le message NDEF vide (`03 00 FE 00`) ; une puce qu'un téléphone a formatée peut contenir à la place un enregistrement vide (`03 03 D0 00 00 FE`). La carte lit ce premier octet comme le type d'un module : une puce neuve apparaît donc comme *Bubbles*. Le programme la reconnaît d'après ce qu'il y a sur la puce, et la traite comme vierge : l'emplacement ne montre aucun module, **Écrire sur une puce...** est permis, et **Effacer une puce...** dit qu'elle est déjà vierge. Dans le journal de détection l'annonce dit *Bubbles ou une puce neuve*, et une fois la puce lue le journal dit *une puce neuve, pas un module* avec les premiers octets lus. Une puce qui contient d'autres données, comme un texte écrit avec un téléphone, n'est pas prise pour une puce neuve : videz-la d'abord avec une application NFC.
+
 ## Effacer une puce
 
 **Effacer une puce...** vide la puce d'un emplacement, **seulement si elle contient une disposition personnalisée**. La fenêtre le dit en rouge.
@@ -193,9 +201,9 @@ Les deux fenêtres (**Écrire sur une puce...** et **Effacer une puce...**) vous
 |---|---|---|---|---|
 | Un **module du fabricant** (Pads, Grand Clavier, Scaler, Grand Fretboard, Play...) | Refusé : la carte signale un module, et la puce est lue d'abord (*contient une disposition du fabricant*). | Refusé (*contient une disposition du fabricant*). | Permis : seuls les réglages que vous avez changés sont écrits ; la disposition, le type et la couleur restent ; l'original est d'abord sauvegardé dans un fichier et le résultat est relu. | Réécrit la disposition sauvegardée. |
 | Une puce **écrite à partir d'une copie d'une disposition d'usine** | Refusé, comme ci-dessus. | Refusé : elle compte comme du fabricant. | Permis, comme ci-dessus. | Réécrit la disposition sauvegardée. |
-| Une **puce personnalisée** (une disposition dessinée dans le concepteur) | Refusé (*contient déjà une disposition, effacez-la d'abord*). | **Permis** : avertissement en rouge, la puce est lue deux fois, son type doit être celui que la carte a annoncé. | Indisponible : ses enregistrements ne sont pas ceux d'une disposition d'usine, donc ses réglages ne peuvent pas être montrés. | Sans objet. |
-| Une puce avec une disposition d'un **type que le programme ne connaît pas** | Refusé. | Refusé : elle peut être du fabricant. | Indisponible. | Sans objet. |
-| Une puce **vierge** | **Permis** : la puce est détectée, la carte donne les pleins pouvoirs, la disposition est écrite et relue. | Rien à faire : *déjà vierge*. | Rien à modifier. | Sans objet. |
+| Une **puce personnalisée** (une disposition dessinée dans le concepteur) | Refusé (*contient déjà une disposition, effacez-la d'abord*). | **Permis** : avertissement en rouge, la puce est lue deux fois, son type doit être celui que la carte a annoncé. | **S'ouvre dans le concepteur de modules** (ses enregistrements ne sont pas ceux d'une disposition d'usine) : l'original est d'abord sauvegardé dans un fichier, et **Enregistrer** écrit un fichier `-edited.bin` à part ; pour mettre le résultat sur la puce, effacez-la puis écrivez-la. | Sans objet. |
+| Une puce avec une disposition d'un **type que le programme ne connaît pas** | Refusé. | Refusé : elle peut être du fabricant. | S'ouvre dans le concepteur de modules si sa disposition peut être lue ; sinon indisponible. | Sans objet. |
+| Une puce **vierge**, ou **neuve** (elle se lit comme un Pro Bubbles de version 0) | **Permis** : la puce est détectée, la carte donne les pleins pouvoirs, la disposition est écrite et relue. | Rien à faire : *déjà vierge*. | Rien à modifier. | Sans objet. |
 | **Pas de puce** dans l'emplacement | Refusé (*aucune puce n'est détectée*). | Refusé (*aucune puce n'est détectée*). | Rien à modifier. | Sans objet. |
 | La carte **répond pour un autre emplacement** (d'autres modules sont dans les autres emplacements) | Refusé quand la réponse est une disposition ; retirez les autres modules et réessayez. | Refusé quand le type n'est pas celui annoncé. | La lecture d'un emplacement est comparée à l'annonce. | Comparée au module qui a été lu. |
 

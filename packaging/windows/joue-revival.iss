@@ -36,6 +36,7 @@ Source: "{#SourceDir}\JoueRevival-safe-graphics.bat"; DestDir: "{app}"; Flags: i
 Source: "{#SourceDir}\*.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\*.png"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\presets\*"; DestDir: "{app}\presets"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{group}\Joué Revival"; Filename: "{app}\JoueRevival.exe"
