@@ -2,7 +2,7 @@
 
 *English · [Français](README.fr.md)*
 
-An independent, cross-platform editor for the Joué instrument, for the days when the original editor no longer runs.
+An independent, cross-platform editor for the Joué instrument, for the days when the original editor no longer runs (which is already the case for Windows 11).
 
 Joué Revival reads and edits the preset libraries of the original Joué Editor, shows the instrument live (which module is in which slot, where you touch it), edits the settings of the modules in the instrument and uploads them, and has a module designer to draw new layouts, print them at real size, or put them on a tag.
 
