@@ -4,7 +4,7 @@
 
 An independent, cross-platform editor for the Joué instrument, for the days when the original editor no longer runs (which is already the case for Windows 11).
 
-Joué Revival reads and edits the preset libraries of the original Joué Editor, shows the instrument live (which module is in which slot, where you touch it), edits the settings of the modules in the instrument and uploads them, and has a module designer to draw new layouts, print them at real size, or put them on a tag.
+Joué Revival reads and edits the preset libraries of the original Joué Editor, shows the instrument live (which module is in which slot, where you touch it), edits the settings of the modules in the instrument and uploads them. The editor has a module designer to draw new layouts, then print them at real size, and put them on a NFC tag.
 
 ![Joué Revival: the library, the live instrument and the settings of a module](docs/editor-preview.png)
 
@@ -19,11 +19,11 @@ Joué Revival reads and edits the preset libraries of the original Joué Editor,
 > [!WARNING]
 > **Uploading writes to the tag of a module.** The module's previous layout is saved as a file first and can be restored.
 > Writing a layout to a blank tag, erasing a tag and the temporary layout are new and have been tried on very
-> few NTAG216 tags: try one tag first, with the other modules taken out of the instrument.
+> few NTAG216 tags: try one tag first, with the other modules taken out of the instrument. Erasing and rewriting on the original Joué modules is not permitted.
 
 ## Install a release
 
-Download the package for your system from the Releases page (the packages are built by GitHub Actions for every release tag). Each package has this README, the [User guide](docs/user-guide.md) and the [Module designer guide](docs/module-designer.md).
+Download the package for your system from the Releases page (the packages are built by GitHub Actions for every release, except current macOS arm). Each package has this README, the [User guide](docs/user-guide.md) and the [Module designer guide](docs/module-designer.md).
 
 ### Windows
 
