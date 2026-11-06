@@ -125,4 +125,8 @@ Joué Revival is free software under the **GNU General Public License v3 or late
 
 The factory presets in `presets/` come from the manufacturer's application: they are included so that the program works at once, and they are not covered by the GPL.
 
-The protocol and the formats come from reverse engineering the Windows editor (decompiled .NET) and the macOS editor (its own code run in an emulator), from the firmware images, and from the open-source [J-Play](https://github.com/Pjoooo/jplay-opensource) project (Pascal Joguet, GPL-3.0). Dear ImGui, GLFW, pugixml and stb_image are used under their own licences. Author: Simon Bourdareau.
+The protocol and the formats come from reverse engineering the Windows editor (decompiled .NET) and the macOS editor, from the firmware images, and from the open-source [J-Play](https://github.com/Pjoooo/jplay-opensource) project (Pascal Joguet, GPL-3.0). Dear ImGui, GLFW, pugixml and stb_image are used under their own licences.
+
+The release of this editor was done with the authorization of Pascal Joguet. I contact him by email to make sure I will no step on intellectual property belonging to Joue Music and any other structure. Pascal is also proposing a web-based version of the original editor that will be avialable soon.
+
+Author: Simon Bourdareau.
