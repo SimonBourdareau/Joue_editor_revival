@@ -127,6 +127,6 @@ The factory presets in `presets/` come from the manufacturer's application: they
 
 The protocol and the formats come from reverse engineering the Windows editor (decompiled .NET) and the macOS editor, from the firmware images, and from the open-source [J-Play](https://github.com/Pjoooo/jplay-opensource) project (Pascal Joguet, GPL-3.0). Dear ImGui, GLFW, pugixml and stb_image are used under their own licences.
 
-The release of this editor was done with the authorization of Pascal Joguet. I contact him by email to make sure I will no step on intellectual property belonging to Joue Music and any other structure. Pascal is also proposing a web-based version of the original editor that will be avialable soon.
+This editor is released with the authorization of Pascal Joguet. I contacted him by email to make sure I would not step on intellectual property belonging to Joué Music or any other party. Pascal is also preparing a web-based version of the original editor, which will be available soon.
 
 Author: Simon Bourdareau.
