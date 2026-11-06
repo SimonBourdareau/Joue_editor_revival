@@ -4,7 +4,7 @@
 
 Un éditeur indépendant et multiplateforme pour l'instrument Joué, pour les jours où l'éditeur d'origine ne fonctionne plus (ce qui est déjà le cas sous Windows 11).
 
-Joué Revival lit et modifie les bibliothèques de préréglages de l'éditeur Joué d'origine, montre l'instrument en direct (quel module est dans quel emplacement, où vous touchez), modifie les réglages des modules de l'instrument et les lui envoie, et contient un concepteur de modules pour dessiner de nouvelles dispositions, les imprimer à la taille réelle, ou les écrire sur une puce.
+Joué Revival lit et modifie les bibliothèques de préréglages de l'éditeur Joué d'origine, affiche l'instrument en temps réel (quel module se trouve dans quel emplacement, où vous le touchez), modifie les paramètres des modules de l'instrument et les lui envoie. L'éditeur dispose d'un concepteur de modules permettant de dessiner de nouvelles configurations, puis de les imprimer en taille réelle et de les enregistrer sur une étiquette NFC.
 
 ![Joué Revival : la bibliothèque, l'instrument en direct et les réglages d'un module](docs/editor-preview-fr.png)
 
