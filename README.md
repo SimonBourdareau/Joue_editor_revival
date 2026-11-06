@@ -1,4 +1,4 @@
-# Joué Revival
+# Joué Editor Revival
 
 *English · [Français](README.fr.md)*
 
