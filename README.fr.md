@@ -125,4 +125,8 @@ Joué Revival est un logiciel libre sous **licence publique générale GNU v3 ou
 
 Les préréglages d'usine de `presets/` viennent de l'application du fabricant : ils sont inclus pour que le programme fonctionne tout de suite, et ils ne sont pas couverts par la GPL.
 
-Le protocole et les formats viennent de la rétro-ingénierie de l'éditeur Windows (.NET décompilé) et de l'éditeur macOS (son propre code exécuté dans un émulateur), des images du micrologiciel, et du projet libre [J-Play](https://github.com/Pjoooo/jplay-opensource) (Pascal Joguet, GPL-3.0). Dear ImGui, GLFW, pugixml et stb_image sont utilisés sous leurs propres licences. Auteur : Simon Bourdareau.
+Le protocole et les formats viennent de la rétro-ingénierie de l'éditeur Windows (.NET décompilé) et de l'éditeur macOS, des images du micrologiciel, et du projet libre [J-Play](https://github.com/Pjoooo/jplay-opensource) (Pascal Joguet, GPL-3.0). Dear ImGui, GLFW, pugixml et stb_image sont utilisés sous leurs propres licences.
+
+La publication de cet éditeur a été réalisée avec l'autorisation de Pascal Joguet. Je l'ai contacté par e-mail afin de m'assurer que je ne porterais pas atteinte aux droits de propriété intellectuelle appartenant à Joue Music ou à toute autre entité. Pascal propose également une version en ligne de l'éditeur original, qui sera bientôt disponible.
+
+Auteur : Simon Bourdareau.
