@@ -48,7 +48,6 @@ bool hasOctaveButtons(const ModuleBlob& blob) {
 
 bool moduleMayAnswerFrom(int widthInSlots, int slot) {
     if (widthInSlots >= SlotCount) return slot == 1;
-    if (widthInSlots == 2) return slot <= 2;
     return slot >= 1 && slot <= SlotCount;
 }
 

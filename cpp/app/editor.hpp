@@ -56,6 +56,8 @@ private:
     void openFromPath(const std::string& path);
     bool saveLibrary();
     void exportCopy(const std::string& path);
+    void importPresets(const std::string& path);   // adds the presets of another library file, the locked ones left out, in a new folder
+    void exportMine(const std::string& path);      // writes only the presets and folders that are not locked factory presets
     std::string snapshot() const;
     void rebuildObserved();
     void setStatus(const std::string& message, bool error = false);
@@ -128,6 +130,8 @@ private:
     long long lastUpdateCheck_ = 0;
 
     bool openPathPopup_ = false, deletePopup_ = false, quitPopup_ = false, exportPopup_ = false, aboutPopup_ = false;
+    bool importPopup_ = false, exportMinePopup_ = false;
+    std::string searchText_, searchNeedle_;  // the search box above the library, and its text in lower case
     Texture logo_;  // the logo of the program, made when it is first drawn
     void drawAbout();
     void loadUiSettings();

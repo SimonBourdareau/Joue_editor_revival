@@ -11,7 +11,7 @@ This guide covers the main window. For drawing layouts, printing them and writin
 - **Centre: the module.** Its picture (click an element to edit it) and, for a preset that fits a module in the instrument, the upload panel.
 - **Right: Settings and MIDI mapping.** The settings of the module, and those of the element you clicked.
 
-Menus: **File** (New library, Open..., Open from path..., Open the factory presets, Module designer..., Save, Export a copy..., Quit), **Edit** (Undo, Redo), **View** (Device information, Module designer, Live instrument, Language / Langue, Touch to select, Listen to the Play port), **Help** (Quick start, User guide, Module designer guide, updates).
+Menus: **File** (New library, Open..., Open from path..., Open the factory presets, Module designer..., Save, Export a copy..., Import presets..., Export my presets..., Quit), **Edit** (Undo, Redo), **View** (Device information, Module designer, Live instrument, Language / Langue, Touch to select, Listen to the Play port), **Help** (Quick start, User guide, Module designer guide, updates).
 
 ## The library
 
@@ -20,6 +20,8 @@ The factory presets (`presets/factoryLibrary.xml`) load by themselves the first 
 - **Factory presets are locked** (padlock). They cannot be deleted, and their settings are greyed. **Unlock to edit** unlocks one for this session; **Duplicate** makes a copy that is yours. Play Audio is locked like the others, though the original library leaves it unlocked.
 - **New folder, Duplicate, Up, Down, Delete** work on the selected item. A folder that holds a locked preset cannot be deleted either.
 - **Undo and Redo** (Ctrl+Z, Shift+Ctrl+Z) cover every change.
+- **Search presets** (the box above the list) shows only the presets and folders whose name, or kind of module, contains what you type; folders open while you search, and clearing the box brings the list back.
+- **File > Import presets...** adds the presets of another library file (for instance one that a friend exported) in a new folder named after the file; the locked factory presets in that file are left out. Undo takes the import away, and nothing is kept until you press **Save**. **File > Export my presets...** writes only your own presets and folders, to share them; it does not change your library.
 
 ## Editing a module's settings
 
@@ -35,11 +37,13 @@ Click an element in the picture to see its **MIDI mapping** on the right.
 ## The live instrument
 
 1. **Quit the original Joué Editor** first: it holds the instrument's MIDI ports.
-2. Connect the Joué. The modules appear in their slots with the picture of their layout. A module of three slots answers from slot 1 only, one of two slots from slot 1 or 2.
+2. Connect the Joué. The modules appear in their slots with the picture of their layout. A module of three slots answers from slot 1 only; a smaller one can answer from any slot, because its tag may sit in either of its slots. If a module you put in is not shown, open **Details** under the live instrument: the log says what the board announced and, when the layout could not be read, why. Send those lines when you report it.
 3. **Touches** are drawn from the notes, pressure and controllers the instrument plays; they are not measured positions. The **octave** buttons on the picture correct the octave the program assumes.
 4. If something looks wrong, press **Rescan modules**, and open **Details** and its **Detection log**: they say what the board announced, what was read for each slot and why a read was refused.
 5. **Touch to select** (View menu, on by default): put a finger on the instrument and the editor selects that element, as a click on it would, in the open module when it is of the same kind as the module you touched (a Scaler preset, or a Scaler opened with Edit). Touching the temporary layout of the designer selects the element in the designer. It needs the Play port: see the next point.
 6. **View > Listen to the Play port (touches)** off: the program no longer holds the Play port (use it if a MIDI monitor or a synthesizer stops getting the notes), and no touches are drawn.
+
+A module that the board announces but whose layout cannot be read is listed in orange (*detected, but its layout could not be read*); the reason is in the **Detection log**. If the Joué is in firmware update mode the program says so, instead of *No Joué found*: update it with the Joué firmware updater first. On a **Joué Play** board (one without the Pro firmware) the editor reads and shows the modules but cannot change them: uploading, writing and erasing a tag and the temporary layout are disabled, with a message. This has not been tried on a real Play board.
 
 ## Editing the module that is in the instrument
 
@@ -55,7 +59,7 @@ A preset has an **Upload to Joué** panel when a module of the same type, versio
 
 ## Device information
 
-**View > Device information...** shows what the instrument says about itself, without writing anything: the hardware id and the family of firmware it takes, the firmware version and build, the touch processor, the serial of the board, the id of the tag in each slot, the modules announced, and the MIDI ports in use. **Read again** reads it again; **Copy** puts it on the clipboard, always in English, to send with a question or a bug report. A board that does not answer is shown as *not answered*, never as zeros.
+**View > Device information...** shows what the instrument says about itself, without writing anything: the hardware id and the family of firmware it takes, the limitations of the board (whether it is a Play board), the firmware version and build, the touch processor, the serial of the board, the id of the tag in each slot, the modules announced, and the MIDI ports in use. **Read again** reads it again; **Copy** puts it on the clipboard, always in English, to send with a question or a bug report. A board that does not answer is shown as *not answered*, never as zeros.
 
 ## Comparing
 
@@ -95,8 +99,10 @@ The data folder is `%APPDATA%\JoueEditorNG` on Windows, `~/Library/Application S
 | Problem | What to do |
 |---|---|
 | Black areas in the window | Start with `--safe-graphics` (Windows: `JoueRevival-safe-graphics.bat`). |
-| No *Connected* | Quit the original editor; unplug and plug the USB cable; look at the ports line under **Details**. |
+| No *Connected* | Quit the original editor; unplug and plug the USB cable; look at the ports line under **Details**. If it says the Joué is in firmware update mode, update it with the Joué firmware updater first. |
 | A module is missing or in the wrong slot | **Rescan modules**; read the **Detection log**. |
+| The upload and tag buttons are greyed, with a message about a Joué Play | The board is a Play board: it cannot change modules, a Joué Pro is needed. |
+| A module is listed in orange: *detected, but its layout could not be read* | Open **Details**, **Detection log**, and send the lines for that slot when you report it. |
 | Another program gets no notes | Switch off **View > Listen to the Play port**. |
 | macOS says the app is damaged or from an unknown developer | `xattr -cr "Joue Revival.app"`, or right click, **Open**. |
 | Windows SmartScreen warns | **More info**, **Run anyway**: the file is not signed. |

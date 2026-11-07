@@ -11,7 +11,7 @@ Ce guide couvre la fenêtre principale. Pour dessiner des dispositions, les impr
 - **Au centre : le module.** Son image (cliquez sur un élément pour le modifier) et, pour un préréglage qui convient à un module de l'instrument, le panneau d'envoi.
 - **À droite : Réglages et Affectation MIDI.** Les réglages du module, et ceux de l'élément sur lequel vous avez cliqué.
 
-Menus : **Fichier** (Nouvelle bibliothèque, Ouvrir..., Ouvrir depuis un chemin..., Ouvrir les préréglages d'usine, Concepteur de modules..., Enregistrer, Exporter une copie..., Quitter), **Modifier** (Annuler, Rétablir), **Affichage** (Informations sur l'appareil, Concepteur de modules, Instrument en direct, Language / Langue, Toucher pour sélectionner, Écouter le port Play), **Aide** (Démarrage rapide, Guide de l'utilisateur, Guide du concepteur de modules, mises à jour).
+Menus : **Fichier** (Nouvelle bibliothèque, Ouvrir..., Ouvrir depuis un chemin..., Ouvrir les préréglages d'usine, Concepteur de modules..., Enregistrer, Exporter une copie..., Importer des préréglages..., Exporter mes préréglages..., Quitter), **Modifier** (Annuler, Rétablir), **Affichage** (Informations sur l'appareil, Concepteur de modules, Instrument en direct, Language / Langue, Toucher pour sélectionner, Écouter le port Play), **Aide** (Démarrage rapide, Guide de l'utilisateur, Guide du concepteur de modules, mises à jour).
 
 ## La bibliothèque
 
@@ -20,6 +20,8 @@ Les préréglages d'usine (`presets/factoryLibrary.xml`) se chargent tout seuls 
 - **Les préréglages d'usine sont verrouillés** (cadenas). Ils ne peuvent pas être supprimés, et leurs réglages sont grisés. **Déverrouiller pour modifier** en déverrouille un pour cette session ; **Dupliquer** en fait une copie qui est à vous. Play Audio est verrouillé comme les autres, bien que la bibliothèque d'origine le laisse déverrouillé.
 - **Nouveau dossier, Dupliquer, Monter, Descendre, Supprimer** agissent sur l'élément sélectionné. Un dossier qui contient un préréglage verrouillé ne peut pas non plus être supprimé.
 - **Annuler et Rétablir** (Ctrl+Z, Maj+Ctrl+Z) couvrent chaque modification.
+- **Rechercher un préréglage** (la zone au-dessus de la liste) n'affiche que les préréglages et dossiers dont le nom, ou le genre de module, contient ce que vous tapez ; les dossiers s'ouvrent pendant la recherche, et vider la zone ramène la liste.
+- **Fichier > Importer des préréglages...** ajoute les préréglages d'un autre fichier de bibliothèque (par exemple un qu'un ami a exporté) dans un nouveau dossier qui porte le nom du fichier ; les préréglages d'usine verrouillés de ce fichier sont laissés de côté. Annuler retire l'import, et rien n'est gardé tant que vous n'appuyez pas sur **Enregistrer**. **Fichier > Exporter mes préréglages...** écrit seulement vos propres préréglages et dossiers, pour les partager ; cela ne change pas votre bibliothèque.
 
 ## Modifier les réglages d'un module
 
@@ -35,11 +37,13 @@ Cliquez sur un élément de l'image pour voir son **Affectation MIDI** à droite
 ## L'instrument en direct
 
 1. **Quittez d'abord l'éditeur Joué d'origine** : il garde les ports MIDI de l'instrument.
-2. Branchez le Joué. Les modules apparaissent dans leurs emplacements avec l'image de leur disposition. Un module de trois emplacements répond depuis l'emplacement 1 seulement, un de deux emplacements depuis l'emplacement 1 ou 2.
+2. Branchez le Joué. Les modules apparaissent dans leurs emplacements avec l'image de leur disposition. Un module de trois emplacements répond depuis l'emplacement 1 seulement ; un module plus petit peut répondre depuis n'importe quel emplacement, car sa puce peut être dans l'un ou l'autre de ses emplacements. Si un module que vous mettez n'apparaît pas, ouvrez **Détails** sous l'instrument en direct : le journal dit ce que la carte a annoncé et, quand la disposition n'a pas pu être lue, pourquoi. Envoyez ces lignes quand vous le signalez.
 3. **Les contacts** sont dessinés d'après les notes, la pression et les contrôleurs que joue l'instrument ; ce ne sont pas des positions mesurées. Les boutons **octave** sur l'image corrigent l'octave que suppose le programme.
 4. Si quelque chose semble faux, appuyez sur **Réanalyser les modules**, et ouvrez **Détails** puis son **Journal de détection** : ils disent ce que la carte a annoncé, ce qui a été lu pour chaque emplacement et pourquoi une lecture a été refusée.
 5. **Toucher pour sélectionner** (menu Affichage, activé par défaut) : posez un doigt sur l'instrument et l'éditeur sélectionne cet élément, comme un clic dessus, dans le module ouvert quand il est du même type que le module touché (un préréglage Scaler, ou un Scaler ouvert avec Modifier). Toucher la disposition temporaire du concepteur sélectionne l'élément dans le concepteur. Cela demande le port Play : voir le point suivant.
 6. **Affichage > Écouter le port Play (contacts)** désactivé : le programme ne garde plus le port Play (utilisez-le si un moniteur MIDI ou un synthétiseur ne reçoit plus les notes), et aucun contact n'est dessiné.
+
+Un module que la carte annonce mais dont la disposition ne peut pas être lue est affiché en orange (*détecté, mais sa disposition n'a pas pu être lue*) ; la raison est dans le **Journal de détection**. Si le Joué est en mode de mise à jour du micrologiciel, le programme le dit, au lieu de *Aucun Joué trouvé* : mettez-le d'abord à jour avec l'outil de mise à jour Joué. Sur une carte **Joué Play** (sans le micrologiciel Pro), l'éditeur lit et montre les modules mais ne peut pas les modifier : l'envoi, l'écriture et l'effacement d'une puce et la disposition temporaire sont désactivés, avec un message. Cela n'a pas été essayé sur une vraie carte Play.
 
 ## Modifier le module qui est dans l'instrument
 
@@ -55,7 +59,7 @@ Un préréglage a un panneau **Envoyer vers le Joué** quand un module du même 
 
 ## Informations sur l'appareil
 
-**Affichage > Informations sur l'appareil...** montre ce que l'instrument dit de lui-même, sans rien écrire : l'identifiant matériel et la famille de micrologiciel qu'il prend, la version et le build du micrologiciel, le processeur tactile, le numéro de série de la carte, l'identifiant de la puce de chaque emplacement, les modules annoncés, et les ports MIDI utilisés. **Relire** lit de nouveau ; **Copier** met le tout dans le presse-papiers, toujours en anglais, pour l'envoyer avec une question ou un rapport de bogue. Une carte qui ne répond pas est montrée comme *sans réponse*, jamais comme des zéros.
+**Affichage > Informations sur l'appareil...** montre ce que l'instrument dit de lui-même, sans rien écrire : l'identifiant matériel et la famille de micrologiciel qu'il prend, les limites de la carte (si c'est une carte Play), la version et le build du micrologiciel, le processeur tactile, le numéro de série de la carte, l'identifiant de la puce de chaque emplacement, les modules annoncés, et les ports MIDI utilisés. **Relire** lit de nouveau ; **Copier** met le tout dans le presse-papiers, toujours en anglais, pour l'envoyer avec une question ou un rapport de bogue. Une carte qui ne répond pas est montrée comme *sans réponse*, jamais comme des zéros.
 
 ## Comparer
 
@@ -95,8 +99,10 @@ Le dossier de données est `%APPDATA%\JoueEditorNG` sous Windows, `~/Library/App
 | Problème | Que faire |
 |---|---|
 | Zones noires dans la fenêtre | Démarrer avec `--safe-graphics` (Windows : `JoueRevival-safe-graphics.bat`). |
-| Pas de *Connecté* | Quitter l'éditeur d'origine ; débrancher et rebrancher le câble USB ; regarder la ligne des ports sous **Détails**. |
+| Pas de *Connecté* | Quitter l'éditeur d'origine ; débrancher et rebrancher le câble USB ; regarder la ligne des ports sous **Détails**. S'il est dit que le Joué est en mode de mise à jour du micrologiciel, le mettre d'abord à jour avec l'outil de mise à jour Joué. |
 | Un module manque ou est dans le mauvais emplacement | **Réanalyser les modules** ; lire le **Journal de détection**. |
+| Les boutons d'envoi et de puce sont grisés, avec un message sur un Joué Play | La carte est une carte Play : elle ne peut pas modifier les modules, il faut un Joué Pro. |
+| Un module est affiché en orange : *détecté, mais sa disposition n'a pas pu être lue* | Ouvrir **Détails**, **Journal de détection**, et envoyer les lignes de cet emplacement en le signalant. |
 | Un autre programme ne reçoit pas les notes | Désactiver **Affichage > Écouter le port Play**. |
 | macOS dit que l'application est endommagée ou d'un développeur inconnu | `xattr -cr "Joue Revival.app"`, ou clic droit, **Ouvrir**. |
 | Windows SmartScreen avertit | **Informations complémentaires**, **Exécuter quand même** : le fichier n'est pas signé. |

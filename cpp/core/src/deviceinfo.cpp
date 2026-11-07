@@ -25,6 +25,7 @@ std::string versionAndBuild(const std::optional<std::uint32_t>& version, const s
 DeviceInfo readDeviceInfo(Device& device) {
     DeviceInfo info;
     info.hardwareId = device.hardwareId();
+    info.hardwareLimitations = device.hardwareLimitations();
     info.touchHardwareId = device.touchHardwareId();
     info.firmwareVersion = device.firmwareVersion();
     info.touchVersion = device.touchVersion();
@@ -36,6 +37,8 @@ DeviceInfo readDeviceInfo(Device& device) {
 }
 
 std::string versionText(std::uint32_t version) { return std::to_string(version / 100) + "." + std::to_string(version % 100); }
+
+bool isPlayBoard(std::uint32_t limitations) { return (limitations & LimitationPlayBoard) != 0; }
 
 std::string hardwareFamily(std::uint32_t hardwareId) {
     switch (hardwareId) {
@@ -50,6 +53,12 @@ std::string hardwareFamily(std::uint32_t hardwareId) {
 std::vector<std::pair<std::string, std::string>> describeDeviceInfo(const DeviceInfo& info) {
     std::vector<std::pair<std::string, std::string>> lines;
     lines.push_back({"Hardware", info.hardwareId ? std::to_string(*info.hardwareId) + " (family " + hardwareFamily(*info.hardwareId) + ")" : std::string("not answered")});
+    if (info.hardwareLimitations) {
+        std::string text;
+        if (isPlayBoard(*info.hardwareLimitations)) text = "Play board: its modules can be read but not changed";
+        if (*info.hardwareLimitations & LimitationAccessories) text += std::string(text.empty() ? "" : "; ") + "accessories";
+        lines.push_back({"Limitations", text.empty() ? std::string("none") : text});
+    }
     lines.push_back({"Firmware", versionAndBuild(info.firmwareVersion, info.firmwareBuild)});
     std::string touch = versionAndBuild(info.touchVersion, info.touchBuild);
     if (info.touchHardwareId && info.touchVersion) touch += ", hardware " + std::to_string(*info.touchHardwareId);

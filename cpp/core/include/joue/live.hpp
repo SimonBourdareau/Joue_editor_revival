@@ -28,8 +28,8 @@ struct PlacedModule {
 // from slot 3; when it answers from slot 2 it takes 1 and 2, unless slot 1 is taken by another module and 3 is free.
 std::vector<PlacedModule> placeModules(const std::array<SlotInfo, SlotCount>& slots);
 
-// A module of three slots answers from slot 1 only, one of two slots from slot 1 or 2: a module cannot reach past the last slot, so one
-// announced anywhere else is not a module that is there (a mistaken read, not a layout to show).
+// A module of three slots answers from slot 1 only: it fills the whole instrument. A module of one or two slots can answer from any slot,
+// because its tag may sit in either of its slots: a module of two slots on slots 2 and 3 can answer from slot 3.
 bool moduleMayAnswerFrom(int widthInSlots, int slot);
 
 // Decides when a scan of the slots counts as a change, so that the picture does not flicker. A scan that equals what is shown

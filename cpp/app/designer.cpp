@@ -291,7 +291,8 @@ void Designer::drawToolbar() {
             drawEraseWindow();
         }
         ImGui::SameLine();
-        if (!can) ImGui::TextDisabled("%s", tr("Needs the live instrument open and the Joue connected."));
+        if (!can && playBoard && playBoard()) ImGui::TextDisabled("%s", tr("This board is a Joué Play: its modules can be read but not changed. A Joué Pro is needed to change them."));
+        else if (!can) ImGui::TextDisabled("%s", tr("Needs the live instrument open and the Joue connected."));
         else if (loadStatus && !loadStatus().empty()) ImGui::TextDisabled("%s", joue::i18n::message(loadStatus()).c_str());
         if (ImGui::BeginPopupModal(tr("Play on the device (temporary)##temporaryload"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::TextUnformatted(tr("Sends this layout to the Joué as a temporary module."));

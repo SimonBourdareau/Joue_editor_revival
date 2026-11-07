@@ -56,6 +56,7 @@ Download `joue-revival-linux-x86_64.AppImage`, make it executable (`chmod +x jou
 ## What you can do with the Joué Revival Editor
 
 - **Browse and edit libraries:** the factory presets (loaded at the first start; locked, and not deletable), your own folders and copies, saved with a backup of the previous file.
+- **Find, import and export presets:** a search box above the library; **File > Import presets...** adds the presets of another library file; **File > Export my presets...** writes your own to share.
 - **See the instrument live:** the modules in the slots, the touches, the octave of the keys; **touch to select**, which selects in the editor the element your finger is on; **Rescan modules** and a detection log when something looks wrong.
 - **Edit a module in the instrument:** the Action of buttons and pads, notes, scales (23 of the original and 47 more), the bubble, the Y control, pressure range, MPE and aftertouch; then upload the changes, or restore the original. A module with a custom layout opens in the module designer instead.
 - **Upload a preset to a module** of the same type, with the list of what will change; **compare** two presets, or a preset with the module in the instrument, without writing anything.
@@ -118,6 +119,7 @@ The window uses X11 (it works under XWayland, not in a pure Wayland session). MI
 - **On Windows, MIDI port sharing** depends on the system: if another program (a MIDI monitor) loses the notes, switch off **View > Listen to the Play port**.
 - **macOS:** the app is not notarized, and only Apple silicon is released.
 - **Linux:** untested with an instrument.
+- **Joué Play boards:** a board without the Pro firmware can be read but its modules cannot be changed; the editor disables uploading and tag writing and says why. This has not been tried on a real Play board.
 
 ## Licence and credits
 

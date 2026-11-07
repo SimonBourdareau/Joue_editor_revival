@@ -116,7 +116,7 @@ const Texture& LiveView::pictureFor(Picture& picture, const unsigned char* png, 
 
 bool LiveView::canPush(int slot) {
     std::lock_guard<std::mutex> lock(mutex_);
-    return connected_ && !pushing_ && !pushJob_ && announced_.present(slot);
+    return connected_ && !pushing_ && !pushJob_ && announced_.present(slot) && !playBoard();
 }
 
 std::vector<LiveView::LiveModule> LiveView::modules() {
@@ -133,6 +133,11 @@ std::vector<LiveView::LiveModule> LiveView::modules() {
 bool LiveView::canLoadTemporarily() {
     std::lock_guard<std::mutex> lock(mutex_);
     return connected_ && !pushing_ && !pushJob_ && !temporaryJob_ && !tagJob_;
+}
+
+bool LiveView::playBoard() {
+    int flags = limitations_;
+    return flags >= 0 && joue::isPlayBoard(static_cast<std::uint32_t>(flags));
 }
 
 bool LiveView::canWriteTag() {
@@ -275,6 +280,12 @@ void LiveView::disconnect() {
     havePlayPair_ = false;
     blobs_ = {};
     blobStamp_ = {};
+    blankStamp_ = {};
+    refusedStamp_ = {};
+    unreadable_ = {};
+    unreadReason_ = {};
+    shownUnreadable_ = {};
+    limitations_ = -1;
     filter_ = joue::SlotFilter();
     portMisses_ = 0;
     apply(std::array<joue::SlotInfo, joue::SlotCount>{});
@@ -330,12 +341,18 @@ bool LiveView::connect(std::string& error) {
     try {
         auto pairs = joue::findPairs(joue::listEndpoints());
         std::vector<joue::PortPair> mine;
+        bool bootloader = false;
         for (const joue::PortPair& p : pairs) {
-            if (joue::looksLikeJoue(p.source) || joue::looksLikeJoue(p.destination)) mine.push_back(p);
+            if (!(joue::looksLikeJoue(p.source) || joue::looksLikeJoue(p.destination))) continue;
+            if (joue::roleOf(p.source) == joue::PortRole::Bootloader || joue::roleOf(p.destination) == joue::PortRole::Bootloader) {
+                bootloader = true;
+                continue;
+            }
+            mine.push_back(p);
         }
         int edit = joue::chooseEditorPair(mine);
         if (edit < 0) {
-            error = "No Joue found on the MIDI ports.";
+            error = bootloader ? "This Joue is in firmware update mode: update it with the Joue firmware updater, then reconnect." : "No Joue found on the MIDI ports.";
             return false;
         }
         editSource_ = mine[static_cast<std::size_t>(edit)].source.name;
@@ -372,6 +389,9 @@ bool LiveView::connect(std::string& error) {
         if (havePlayPair_) playPair_ = mine[static_cast<std::size_t>(play)];
         bool touches = listenToPlay && openPlay();
         auto hardware = device_->hardwareId();
+        auto limits = device_->hardwareLimitations();
+        limitations_ = limits ? static_cast<int>(*limits) : -1;
+        if (limits && joue::isPlayBoard(*limits)) note("the board is a Play board: its modules can be read but not changed");
         {
             std::lock_guard<std::mutex> lock(mutex_);
             announced_.clear();
@@ -379,6 +399,11 @@ bool LiveView::connect(std::string& error) {
         }
         blobs_ = {};
         blobStamp_ = {};
+        blankStamp_ = {};
+        refusedStamp_ = {};
+        unreadable_ = {};
+        unreadReason_ = {};
+        shownUnreadable_ = {};
         filter_ = joue::SlotFilter();
         scanner_->forget();
         connectedAtMs_ = nowMs();
@@ -407,6 +432,10 @@ void LiveView::apply(const std::array<joue::SlotInfo, joue::SlotCount>& slots) {
     auto shown = std::make_shared<Shown>();
     shown->placed = joue::placeModules(slots);
     for (const joue::PlacedModule& m : shown->placed) shown->designs.push_back(joue::Design::fromBytes(m.blob.toBytes()));
+    for (std::size_t i = 0; i < unreadable_.size(); ++i) {
+        if (!unreadable_[i].empty()) shown->unreadable.push_back({static_cast<int>(i) + 1, unreadable_[i]});
+    }
+    shownUnreadable_ = unreadable_;
     std::lock_guard<std::mutex> lock(mutex_);
     shown_ = shown;
     tracker_.setModules(shown->placed);
@@ -441,8 +470,10 @@ void LiveView::scanOnce(bool urgent) {
         // the board says which slots hold a module; a blob is read only for those, and again only for a new insertion
         for (int slot = 1; slot <= joue::SlotCount; ++slot) {
             std::size_t i = static_cast<std::size_t>(slot - 1);
+            unreadable_[i].clear();
             if (!announced.present(slot)) {
                 blobs_[i].clear();
+                blankStamp_[i] = 0;
                 continue;
             }
             if (!joue::moduleMayAnswerFrom(joue::moduleSlots(announced.event(slot).type), slot)) {
@@ -461,9 +492,13 @@ void LiveView::scanOnce(bool urgent) {
                 // a read of a slot can hand back the module of another one: what is kept for a slot must be the type of
                 // module the board announced there, and a read that is not is made again
                 std::string head = "nothing read";
+                std::string reason = "no answer";
                 for (int attempt = 0; attempt < 3 && blobs_[i].empty(); ++attempt) {
                     auto blob = device_->readModule(slot);
-                    if (blob && !blob->empty()) head = hexHead(*blob);
+                    if (blob && !blob->empty()) {
+                        head = hexHead(*blob);
+                        reason = "a short answer of " + std::to_string(blob->size()) + " bytes";
+                    }
                     if (blob && joue::looksLikeNewTag(*blob) && joue::announcementMayBeNewTag(event.type)) {
                         blankStamp_[i] = announced.stamp(slot);
                         note("slot " + std::to_string(slot) + ": a new tag, not a module (first bytes " + hexHead(*blob) + ": the empty NDEF message of a new NTAG, which the board reads as Bubbles)");
@@ -479,24 +514,30 @@ void LiveView::scanOnce(bool urgent) {
                             } else {
                                 note("slot " + std::to_string(slot) + ": a read gave a " + joue::moduleName((*blob)[0]) + " but the board announced a " + joue::moduleName(event.type) + "; it was not kept");
                             }
-                        } catch (const std::exception&) {
+                        } catch (const std::exception& error) {
+                            reason = std::string(error.what()) + " (" + std::to_string(blob->size()) + " bytes read)";
                         }
                     }
                     if (blobs_[i].empty() && attempt < 2) std::this_thread::sleep_for(std::chrono::milliseconds(300));
                 }
+                unreadReason_[i] = reason;
                 if (blobs_[i].empty() && blankStamp_[i] != announced.stamp(slot) && refusedStamp_[i] != announced.stamp(slot)) {
                     refusedStamp_[i] = announced.stamp(slot);
-                    note("slot " + std::to_string(slot) + ": no layout that fits the announcement could be read (first bytes " + head + "); the module is not shown (try Rescan modules)");
+                    note("slot " + std::to_string(slot) + ": no layout that fits the announcement could be read (first bytes " + head + "; " + reason + "); the module is not shown (try Rescan modules)");
                 }
             }
             if (!blobs_[i].empty()) slots[i] = {true, blobs_[i]};
+            else if (blankStamp_[i] != announced.stamp(slot)) {
+                joue::ModuleEvent seen = announced.event(slot);
+                unreadable_[i] = joue::moduleName(seen.type) + " (type " + std::to_string(seen.type) + ", version " + std::to_string(seen.version) + ")";
+            }
         }
         {
             std::lock_guard<std::mutex> lock(mutex_);
             fallback_ = false;
         }
         if (!virtualBlob.empty() && !slots[0].present) slots[0] = {true, virtualBlob};
-        if (filter_.offer(slots, true)) apply(filter_.accepted());
+        if (filter_.offer(slots, true) || unreadable_ != shownUnreadable_) apply(filter_.accepted());
         return;
     }
     if (nowMs() - connectedAtMs_ < 4000.0) return;  // the board has not had time to announce its modules yet
@@ -615,6 +656,7 @@ void LiveView::workerMain() {
                     virtualRebaseUntilMs_ = nowMs() + 6000.0;
                 }
                 blobs_ = {};
+                blankStamp_ = {};
                 refusedStamp_ = {};
                 try {
                     client_->setTimeout(std::chrono::milliseconds(2500));
@@ -899,11 +941,17 @@ void LiveView::drawPanel(float height) {
     ImGui::SameLine();
     ImGui::BeginChild("liveinfo", ImVec2(0, size.y), ImGuiChildFlags_None);
 
-    if (connected && shown->placed.empty()) ImGui::TextDisabled("%s", tr("No module."));
+    if (connected && shown->placed.empty() && shown->unreadable.empty()) ImGui::TextDisabled("%s", tr("No module."));
     for (const joue::PlacedModule& m : shown->placed) {
         std::string slots = m.slots == 1 ? std::string(tr("Slot")) + " " + std::to_string(m.firstSlot) : std::string(tr("Slots")) + " " + std::to_string(m.firstSlot) + "-" + std::to_string(m.firstSlot + m.slots - 1);
         ImGui::Text(tr("%s: %s"), slots.c_str(), joue::moduleName(m.blob.header.type).c_str());
     }
+    for (const auto& item : shown->unreadable) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.72f, 0.3f, 1.0f));
+        ImGui::TextWrapped(tr("Slot %d: %s detected, but its layout could not be read (see Details)."), item.first, joue::i18n::message(item.second).c_str());
+        ImGui::PopStyleColor();
+    }
+    if (connected && playBoard()) ImGui::TextWrapped("%s", tr("This board is a Joué Play: its modules can be read but not changed. A Joué Pro is needed to change them."));
     if (connected) {
         if (ImGui::SmallButton(tr("Rescan modules"))) requestRescan();
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Ask the board for its modules again."));

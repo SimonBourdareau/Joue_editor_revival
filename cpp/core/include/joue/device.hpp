@@ -27,7 +27,8 @@ public:
     std::optional<Bytes> moduleSerial(int slot);
     std::optional<std::uint32_t> firmwareVersion();
     std::optional<std::uint32_t> touchVersion();
-    std::optional<std::uint32_t> hardwareId();
+    std::optional<std::uint32_t> hardwareId();           // the first byte of the hardware message
+    std::optional<std::uint32_t> hardwareLimitations();  // the second byte: bit 0 is set on a Play board, which cannot change its modules
     std::optional<std::uint32_t> touchHardwareId();
     std::optional<std::uint16_t> firmwareBuild();
     std::optional<std::uint16_t> touchBuild();

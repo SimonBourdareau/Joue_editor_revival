@@ -56,6 +56,7 @@ Téléchargez `joue-revival-linux-x86_64.AppImage`, rendez-le exécutable (`chmo
 ## Ce que vous pouvez faire avec l'éditeur Joué Revival
 
 - **Parcourir et modifier des bibliothèques :** les préréglages d'usine (chargés au premier démarrage ; verrouillés, et non supprimables), vos propres dossiers et copies, enregistrés avec une sauvegarde du fichier précédent.
+- **Chercher, importer et exporter des préréglages :** une zone de recherche au-dessus de la bibliothèque ; **Fichier > Importer des préréglages...** ajoute les préréglages d'un autre fichier de bibliothèque ; **Fichier > Exporter mes préréglages...** écrit les vôtres pour les partager.
 - **Voir l'instrument en direct :** les modules dans les emplacements, les contacts, l'octave des touches ; **toucher pour sélectionner**, qui sélectionne dans l'éditeur l'élément sur lequel est votre doigt ; **Réanalyser les modules** et un journal de détection quand quelque chose semble faux.
 - **Modifier un module de l'instrument :** l'Action des boutons et des pads, les notes, les gammes (23 de l'original et 47 autres), la bulle, le contrôle Y, la plage de pression, le MPE et l'aftertouch ; puis envoyer les modifications, ou restaurer l'original. Un module qui a une disposition personnalisée s'ouvre à la place dans le concepteur de modules.
 - **Envoyer un préréglage à un module** du même type, avec la liste de ce qui va changer ; **comparer** deux préréglages, ou un préréglage avec le module de l'instrument, sans rien écrire.
@@ -118,6 +119,7 @@ La fenêtre utilise X11 (elle fonctionne sous XWayland, pas dans une session Way
 - **Sous Windows, le partage des ports MIDI** dépend du système : si un autre programme (un moniteur MIDI) perd les notes, désactivez **Affichage > Écouter le port Play**.
 - **macOS :** l'application n'est pas notariée, et seul Apple silicon est publié.
 - **Linux :** non testé avec un instrument.
+- **Cartes Joué Play :** une carte sans le micrologiciel Pro peut être lue mais ses modules ne peuvent pas être modifiés ; l'éditeur désactive l'envoi et l'écriture des puces et dit pourquoi. Cela n'a pas été essayé sur une vraie carte Play.
 
 ## Licence et crédits
 

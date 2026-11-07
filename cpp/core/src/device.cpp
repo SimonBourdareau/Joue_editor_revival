@@ -69,7 +69,17 @@ std::optional<Bytes> Device::serial() { return readAtLeast(paramName("GET", 3), 
 std::optional<Bytes> Device::moduleSerial(int slot) { return readAtLeast(paramName("GET", 31 + checkSlot(slot) - 1), 7); }
 std::optional<std::uint32_t> Device::firmwareVersion() { return readU32(0); }
 std::optional<std::uint32_t> Device::touchVersion() { return readU32(7); }
-std::optional<std::uint32_t> Device::hardwareId() { return readU32(8); }
+std::optional<std::uint32_t> Device::hardwareId() {
+    auto value = readU32(8);
+    if (!value) return std::nullopt;
+    return *value & 0xFFu;
+}
+
+std::optional<std::uint32_t> Device::hardwareLimitations() {
+    auto value = readU32(8);
+    if (!value) return std::nullopt;
+    return (*value >> 8) & 0xFFu;
+}
 std::optional<std::uint32_t> Device::touchHardwareId() { return readU32(6); }
 std::optional<std::uint16_t> Device::firmwareBuild() { return readU16(1); }
 std::optional<std::uint16_t> Device::touchBuild() { return readU16(2); }

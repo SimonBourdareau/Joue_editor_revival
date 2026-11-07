@@ -473,10 +473,11 @@ Editor::Editor(EditorOptions options) : options_(std::move(options)) {
         designer_.chooseSave = [] { return chooseSaveFile(); };
     }
     designer_.openExternally = [](const std::string& path) { openWithSystem(path); };
-    designer_.canLoadTemporarily = [this] { return live_.open && live_.canLoadTemporarily(); };
+    designer_.canLoadTemporarily = [this] { return live_.open && live_.canLoadTemporarily() && !live_.playBoard(); };
+    designer_.playBoard = [this] { return live_.open && live_.playBoard(); };
     designer_.loadTemporarily = [this](const joue::Bytes& blob) { live_.requestTemporaryLoad(blob); };
     designer_.loadStatus = [this] { return live_.pushStatus(); };
-    designer_.canWriteTag = [this] { return live_.open && live_.canWriteTag(); };
+    designer_.canWriteTag = [this] { return live_.open && live_.canWriteTag() && !live_.playBoard(); };
     designer_.writeTag = [this](int slot, const joue::Bytes& layout) { live_.requestWriteTag(slot, layout); };
     designer_.eraseTag = [this](int slot) { live_.requestEraseTag(slot); };
     designer_.slotModule = [this](int slot) {
@@ -600,6 +601,122 @@ bool Editor::saveLibrary() {
     } catch (const std::exception& error) {
         setStatus(error.what(), true);
         return false;
+    }
+}
+
+namespace {
+
+std::vector<std::unique_ptr<Node>> userEntries(Node& owner) {
+    std::vector<std::unique_ptr<Node>> kept;
+    for (auto& entry : entriesOf(owner)) {
+        if (entry->tag == "Module") {
+            if (!flag(*entry, "ReadOnly")) kept.push_back(entry->clone());
+        } else if (entry->tag == "Folder") {
+            std::vector<std::unique_ptr<Node>> inner = userEntries(*entry);
+            if (inner.empty()) continue;
+            std::unique_ptr<Node> folder = entry->clone();
+            auto& list = entriesOf(*folder);
+            list.clear();
+            for (auto& item : inner) list.push_back(std::move(item));
+            kept.push_back(std::move(folder));
+        }
+    }
+    return kept;
+}
+
+int countModules(Node& owner) {
+    int count = 0;
+    for (auto& entry : entriesOf(owner)) {
+        if (entry->tag == "Module") ++count;
+        else if (entry->tag == "Folder") count += countModules(*entry);
+    }
+    return count;
+}
+
+int countModules(std::vector<std::unique_ptr<Node>>& items) {
+    int count = 0;
+    for (auto& item : items) count += item->tag == "Module" ? 1 : countModules(*item);
+    return count;
+}
+
+std::string lowerAscii(std::string text) {
+    for (char& c : text) {
+        if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    }
+    return text;
+}
+
+bool matchesSearch(Node& node, const std::string& needle) {
+    if (needle.empty()) return true;
+    if (lowerAscii(node.name()).find(needle) != std::string::npos) return true;
+    if (node.tag == "Module") return lowerAscii(joue::moduleName(intValue(node, "Type"))).find(needle) != std::string::npos;
+    for (auto& entry : entriesOf(node)) {
+        if ((entry->tag == "Folder" || entry->tag == "Module") && matchesSearch(*entry, needle)) return true;
+    }
+    return false;
+}
+
+bool anyEntryMatches(Node& owner, const std::string& needle) {
+    for (auto& entry : entriesOf(owner)) {
+        if ((entry->tag == "Folder" || entry->tag == "Module") && matchesSearch(*entry, needle)) return true;
+    }
+    return false;
+}
+
+}  // namespace
+
+void Editor::importPresets(const std::string& path) {
+    if (!root_ || !moduleList(*root_)) return;
+    try {
+        std::ifstream in(path, std::ios::binary);
+        if (!in) throw std::runtime_error("Cannot read " + path);
+        std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        std::unique_ptr<Node> source = joue::parseLibrary(text);
+        Node* sourceList = moduleList(*source);
+        std::vector<std::unique_ptr<Node>> kept;
+        if (sourceList) kept = userEntries(*sourceList);
+        int count = countModules(kept);
+        if (count == 0) {
+            setStatus("No presets of yours were found in this file: the locked factory presets are not imported.", true);
+            return;
+        }
+        std::string folderName = "Imported from " + std::filesystem::path(path).stem().string();
+        beginStructural();
+        auto folder = std::make_unique<Node>();
+        folder->tag = "Folder";
+        folder->attrs = {{"name", folderName}};
+        setString(*folder, "IsExpanded", "1");
+        Node* created = folder.get();
+        entriesOf(*moduleList(*root_)).push_back(std::move(folder));
+        auto& list = entriesOf(*created);
+        for (auto& item : kept) list.push_back(std::move(item));
+        selected_ = created;
+        endStructural();
+        setStatus("Imported " + std::to_string(count) + (count == 1 ? " preset" : " presets") + " into the folder " + folderName + ". Save keeps them.");
+    } catch (const std::exception& error) {
+        setStatus(error.what(), true);
+    }
+}
+
+void Editor::exportMine(const std::string& path) {
+    if (!root_ || !moduleList(*root_)) return;
+    try {
+        std::vector<std::unique_ptr<Node>> kept = userEntries(*moduleList(*root_));
+        int count = countModules(kept);
+        if (count == 0) {
+            setStatus("You have no presets of your own to export: the locked factory presets are not exported.", true);
+            return;
+        }
+        std::unique_ptr<Node> library = joue::emptyLibrary();
+        Node* list = moduleList(*library);
+        if (!list) throw std::runtime_error("Cannot build the library to export.");
+        for (auto& item : kept) entriesOf(*list).push_back(std::move(item));
+        std::ofstream out(path, std::ios::binary);
+        out << joue::serializeLibrary(*library);
+        if (!out) throw std::runtime_error("Cannot write " + path);
+        setStatus("Exported " + std::to_string(count) + (count == 1 ? " preset" : " presets") + " to " + path);
+    } catch (const std::exception& error) {
+        setStatus(error.what(), true);
     }
 }
 
@@ -1062,7 +1179,8 @@ void Editor::drawUploadPanel(Node& module) {
         }
     }
     bool busy = live_.pushBusy();
-    beginGrey(slots.empty() || busy);
+    bool playBoard = live_.open && live_.playBoard();
+    beginGrey(slots.empty() || busy || playBoard);
     for (std::size_t i = 0; i < slots.size(); ++i) {
         if (i > 0) ImGui::SameLine();
         char uploadLabel[128];
@@ -1074,6 +1192,7 @@ void Editor::drawUploadPanel(Node& module) {
     }
     if (slots.empty()) ImGui::Button(tr("Upload to Joué..."));
     endGrey();
+    if (playBoard) ImGui::TextWrapped("%s", tr("This board is a Joué Play: its modules can be read but not changed. A Joué Pro is needed to change them."));
     if (!slots.empty()) {
         ImGui::SameLine();
         char compareLabel[128];
@@ -1559,6 +1678,20 @@ void Editor::drawMenuBar() {
                 exportPopup_ = true;
             }
         }
+        if (ImGui::MenuItem(tr("Import presets..."), nullptr, false, root_ != nullptr)) {
+            if (dialogsAvailable()) {
+                if (auto path = chooseOpenFile()) importPresets(*path);
+            } else {
+                importPopup_ = true;
+            }
+        }
+        if (ImGui::MenuItem(tr("Export my presets..."), nullptr, false, root_ != nullptr)) {
+            if (dialogsAvailable()) {
+                if (auto path = chooseSaveFile()) exportMine(*path);
+            } else {
+                exportMinePopup_ = true;
+            }
+        }
         ImGui::Separator();
         if (ImGui::MenuItem(tr("Quit"))) quitRequested_ = true;
         ImGui::EndMenu();
@@ -1649,12 +1782,19 @@ void Editor::drawTreeToolbar() {
     if (ImGui::Button(tr("Delete"))) deletePopup_ = true;
     endGrey();
     if (protectedItem && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", tr("Locked factory presets cannot be deleted."));
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint("##presetsearch", tr("Search presets"), &searchText_);
+    searchNeedle_ = lowerAscii(searchText_);
     ImGui::Separator();
 }
 
 void Editor::drawTree() {
     if (!root_ || !moduleList(*root_)) {
         ImGui::TextDisabled("%s", tr("No library loaded."));
+        return;
+    }
+    if (!searchNeedle_.empty() && !anyEntryMatches(*moduleList(*root_), searchNeedle_)) {
+        ImGui::TextDisabled("%s", tr("No preset matches the search."));
         return;
     }
     drawEntries(*moduleList(*root_));
@@ -1665,6 +1805,7 @@ void Editor::drawEntries(Node& owner) {
     for (auto& entry : list) {
         Node* node = entry.get();
         if (node->tag != "Folder" && node->tag != "Module") continue;
+        if (!searchNeedle_.empty() && !matchesSearch(*node, searchNeedle_)) continue;
         ImGui::PushID(node);
         bool isFolder = node->tag == "Folder";
         std::string label = node->name().empty() ? "(unnamed)" : node->name();
@@ -1672,9 +1813,10 @@ void Editor::drawEntries(Node& owner) {
         if (node == selected_) flags |= ImGuiTreeNodeFlags_Selected;
         if (isFolder) {
             bool expanded = flag(*node, "IsExpanded");
-            ImGui::SetNextItemOpen(expanded, ImGuiCond_Always);
+            bool searching = !searchNeedle_.empty();
+            ImGui::SetNextItemOpen(searching ? true : expanded, ImGuiCond_Always);
             bool open = ImGui::TreeNodeEx(label.c_str(), flags);
-            if (open != expanded) {
+            if (!searching && open != expanded) {
                 setString(*node, "IsExpanded", open ? "1" : "0");
                 dirty_ = true;
             }
@@ -2184,6 +2326,8 @@ void Editor::drawValue(Node& setting, bool locked, const joue::SettingMeta* meta
 void Editor::drawPopups() {
     if (openPathPopup_) { ImGui::OpenPopup(tr("Open library")); openPathPopup_ = false; }
     if (exportPopup_) { ImGui::OpenPopup(tr("Export a copy")); exportPopup_ = false; }
+    if (importPopup_) { pathInput_.clear(); ImGui::OpenPopup(tr("Import presets")); importPopup_ = false; }
+    if (exportMinePopup_) { ImGui::OpenPopup(tr("Export my presets")); exportMinePopup_ = false; }
     if (deletePopup_) { ImGui::OpenPopup(tr("Delete")); deletePopup_ = false; }
     if (quitPopup_) { ImGui::OpenPopup(tr("Unsaved changes")); quitPopup_ = false; }
 
@@ -2194,6 +2338,26 @@ void Editor::drawPopups() {
         ImGui::SetNextItemWidth(520);
         ImGui::InputText(tr("##path"), &pathInput_);
         if (ImGui::Button(tr("Open"))) { openFromPath(pathInput_); ImGui::CloseCurrentPopup(); }
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel"))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal(tr("Import presets"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(tr("Path of a library file with the presets to add:"));
+        ImGui::SetNextItemWidth(520);
+        ImGui::InputText(tr("##importpath"), &pathInput_);
+        if (ImGui::Button(tr("Import"))) { importPresets(pathInput_); ImGui::CloseCurrentPopup(); }
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel"))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal(tr("Export my presets"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(tr("Write my presets (not the locked factory presets) to:"));
+        ImGui::SetNextItemWidth(520);
+        ImGui::InputText(tr("##exportmine"), &pathInput_);
+        if (ImGui::Button(tr("Export"))) { exportMine(pathInput_); ImGui::CloseCurrentPopup(); }
         ImGui::SameLine();
         if (ImGui::Button(tr("Cancel"))) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
