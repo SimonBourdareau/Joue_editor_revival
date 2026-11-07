@@ -741,4 +741,6 @@ static const char* const kFrench[] = {
     "Slot %d: a new, blank tag (no module yet).\tEmplacement %d : une puce neuve, vierge (pas encore de module).",
     "Slot %d holds a new, blank tag: there is nothing to erase. Write to it directly with Write to a tag.\tL'emplacement %d contient une puce neuve, vierge : il n'y a rien à effacer. Écrivez directement dessus avec Écrire sur une puce.",
     "Slot %d holds a new, blank tag: it can be written.\tL'emplacement %d contient une puce neuve, vierge : on peut y écrire.",
+    "A new, blank tag: it is not a module yet.\tUne puce neuve, vierge : ce n'est pas encore un module.",
+    "Detected, but its layout could not be read (see Details).\tDétecté, mais sa disposition n'a pas pu être lue (voir Détails).",
     nullptr};

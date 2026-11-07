@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(joue_editor_ng VERSION 0.42.3 LANGUAGES CXX)
+project(joue_editor_ng VERSION 0.42.4 LANGUAGES CXX)
 # the version shown in the program and in the About window comes from here
 add_compile_definitions(JOUE_VERSION="${PROJECT_VERSION}")
 if(WIN32)

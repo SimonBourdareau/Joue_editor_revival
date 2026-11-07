@@ -939,6 +939,35 @@ void LiveView::drawPanel(float height) {
     float ppm = size.x * box.w / (3.0f * joue::SlotWidthMm);
     float surfaceHeight = joue::SurfaceHeightMm * ppm;
 
+    {
+        // a slot that holds something that is not a module the program can show (a new, blank tag, or a module whose layout cannot be read) gets
+        // the tile that the other editors use for an unknown module: a hatched square with a question mark
+        auto questionTile = [&](int slot, const char* tip) {
+            ImVec2 a = surface + ImVec2(static_cast<float>(slot - 1) * joue::SlotWidthMm * ppm + 1.0f, 1.0f);
+            ImVec2 b = surface + ImVec2(static_cast<float>(slot) * joue::SlotWidthMm * ppm - 1.0f, surfaceHeight - 1.0f);
+            list->AddRectFilled(a, b, IM_COL32(32, 32, 36, 235), 3.0f);
+            list->PushClipRect(a, b, true);
+            float step = 10.0f * scale;
+            for (float k = -(b.y - a.y); k < b.x - a.x; k += step) list->AddLine(ImVec2(a.x + k, b.y), ImVec2(a.x + k + (b.y - a.y), a.y), IM_COL32(255, 255, 255, 16), 1.0f);
+            list->PopClipRect();
+            list->AddRect(a, b, IM_COL32(150, 150, 156, 255), 3.0f, 0, std::max(1.5f, 2.0f * scale));
+            if (Fonts::heading) ImGui::PushFont(Fonts::heading);
+            float fontSize = Fonts::heading ? ImGui::GetFontSize() : ImGui::GetFontSize() * 2.2f;
+            ImVec2 extent = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, "?");
+            list->AddText(ImGui::GetFont(), fontSize, ImVec2(a.x + (b.x - a.x - extent.x) * 0.5f, a.y + (b.y - a.y - extent.y) * 0.5f), IM_COL32(170, 170, 176, 255), "?");
+            if (Fonts::heading) ImGui::PopFont();
+            ImGui::SetCursorScreenPos(a);
+            ImGui::PushID(2000 + slot);
+            ImGui::InvisibleButton("##questiontile", b - a);
+            ImGui::PopID();
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
+        };
+        for (int slot = 1; slot <= joue::SlotCount; ++slot) {
+            if (shown->newTags[static_cast<std::size_t>(slot - 1)]) questionTile(slot, tr("A new, blank tag: it is not a module yet."));
+        }
+        for (const auto& item : shown->unreadable) questionTile(item.first, tr("Detected, but its layout could not be read (see Details)."));
+    }
+
     for (std::size_t i = 0; i < shown->placed.size(); ++i) {
         const joue::PlacedModule& m = shown->placed[i];
         bool isVirtual = !virtualBlob.empty() && m.slot == 1 && m.raw == virtualBlob;
