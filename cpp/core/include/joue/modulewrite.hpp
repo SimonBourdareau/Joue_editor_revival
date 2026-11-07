@@ -36,6 +36,11 @@ PushReport writeBlankTag(Device& device, TransferClient& client, int slot, const
 // What a tag holds, told from the layout on it: nothing, a layout that is not one of the manufacturer's (a known type of module whose records
 // are not those of its factory layout, as a layout drawn in the designer), a manufacturer's (a known type with the records of its factory
 // layout, whatever settings were changed in it), or one that cannot be told (a type this program does not know: it may be a manufacturer's).
+// A module type that no manufacturer's module has (theirs are below 30): a layout of the designer can carry it, so that the other editors show an
+// unknown module instead of taking it for a Pro Area. The program treats every type from here up as one of its own layouts.
+constexpr int CustomModuleType = 200;
+inline bool isCustomModuleType(int type) { return type >= CustomModuleType; }
+
 enum class TagKind { Empty, Custom, Manufacturer, Unknown };
 
 // A new NTAG216 is not empty: its first memory page holds the empty NDEF message, the bytes 03 00 FE, and a tag that a phone has formatted may hold an empty

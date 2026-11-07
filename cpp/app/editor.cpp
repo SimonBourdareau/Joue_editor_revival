@@ -475,6 +475,7 @@ Editor::Editor(EditorOptions options) : options_(std::move(options)) {
     designer_.openExternally = [](const std::string& path) { openWithSystem(path); };
     designer_.canLoadTemporarily = [this] { return live_.open && live_.canLoadTemporarily() && !live_.playBoard(); };
     designer_.playBoard = [this] { return live_.open && live_.playBoard(); };
+    designer_.newTagIn = [this](int slot) { return live_.open && live_.newTagIn(slot); };
     designer_.loadTemporarily = [this](const joue::Bytes& blob) { live_.requestTemporaryLoad(blob); };
     designer_.loadStatus = [this] { return live_.pushStatus(); };
     designer_.canWriteTag = [this] { return live_.open && live_.canWriteTag() && !live_.playBoard(); };

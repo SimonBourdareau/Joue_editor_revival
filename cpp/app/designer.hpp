@@ -23,6 +23,7 @@ public:
 
     // Writing the layout to a blank tag lying in a slot (see joue::writeBlankTag).
     std::function<bool()> canWriteTag;
+    std::function<bool(int)> newTagIn;  // the board sees a new, blank tag in that slot
     std::function<bool()> playBoard;  // the board is a Play board: it cannot change modules
     std::function<void(int, const joue::Bytes&)> writeTag;
     std::function<void(int)> eraseTag;

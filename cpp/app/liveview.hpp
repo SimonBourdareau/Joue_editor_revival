@@ -37,6 +37,8 @@ public:
     bool canWriteTag();
     // True once the board said it is a Play board: its modules can be read but not changed, so nothing is written to them.
     bool playBoard();
+    // True when the board announced a module in the slot whose tag turned out to be a new, blank one.
+    bool newTagIn(int slot);
     void requestWriteTag(int slot, const joue::Bytes& layout);
     // Erases the tag in a slot, only when it holds a custom layout (see joue::blankTag).
     void requestEraseTag(int slot);
@@ -74,6 +76,7 @@ private:
     struct Shown {
         std::vector<joue::PlacedModule> placed;
         std::vector<joue::Design> designs;
+        std::array<bool, 3> newTags{};  // a slot that holds a new, blank tag: not a module
         std::vector<std::pair<int, std::string>> unreadable;  // a module the board announced whose layout could not be read: slot, what the board said
     };
 
@@ -124,6 +127,7 @@ private:
     double virtualRebaseUntilMs_ = 0;  // after a rescan the board announces its modules again; until then the temporary layout is not judged by them, guarded by mutex_
     std::atomic<int> limitations_{-1};  // the limitation flags of the board, -1 until it has answered
     std::array<std::string, 3> unreadable_{}, unreadReason_{}, shownUnreadable_{};  // worker thread only
+    std::array<bool, 3> newTags_{}, shownNewTags_{};  // worker thread only
     std::array<unsigned, 3> blankStamp_{};  // the insertion of a slot that holds a new tag, which is not a module, has been looked at
     std::array<unsigned, 3> refusedStamp_{};  // the insertion of a slot for which no matching layout could be read has been logged
     void note(const std::string& text);

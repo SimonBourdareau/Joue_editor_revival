@@ -51,22 +51,33 @@ bool moduleMayAnswerFrom(int widthInSlots, int slot) {
     return slot >= 1 && slot <= SlotCount;
 }
 
+int tagPositionOf(const Bytes& blob) { return blob.size() > 6 ? std::max(1, static_cast<int>(blob[6])) : 1; }
+
+bool moduleTypeMayAnswerFrom(int type, int widthInSlots, int slot) {
+    if (type >= 22 && type <= 27) return slot >= 1 && slot <= SlotCount;
+    return moduleMayAnswerFrom(widthInSlots, slot);
+}
+
 std::vector<PlacedModule> placeModules(const std::array<SlotInfo, SlotCount>& slots) {
     std::vector<PlacedModule> placed;
     for (int s = 1; s <= SlotCount; ++s) {
         const SlotInfo& info = slots[static_cast<std::size_t>(s - 1)];
         if (!info.present) continue;
         int width = widthInSlots(info.blob);
-        if (width < 1 || !moduleMayAnswerFrom(std::min(width, SlotCount), s)) continue;
+        int type = info.blob.empty() ? 0 : info.blob[0];
+        if (width < 1 || !moduleTypeMayAnswerFrom(type, std::min(width, SlotCount), s)) continue;
         PlacedModule module;
         module.blob = ModuleBlob::parse(info.blob);
         module.raw = info.blob;
         module.slot = s;
         module.slots = std::min(width, SlotCount);
+        int origin = s - tagPositionOf(info.blob) + 1;
         if (module.slots >= SlotCount) {
             module.firstSlot = 1;
         } else if (module.slots == 1) {
             module.firstSlot = s;
+        } else if (origin >= 1 && origin + module.slots - 1 <= SlotCount) {
+            module.firstSlot = origin;
         } else if (s == 1) {
             module.firstSlot = 1;
         } else if (s == SlotCount) {

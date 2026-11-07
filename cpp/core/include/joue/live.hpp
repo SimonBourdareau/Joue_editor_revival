@@ -23,14 +23,22 @@ struct PlacedModule {
     Bytes raw;     // the bytes as read
 };
 
-// Where each module sits. A module answers from the slot of its tag. A large module takes every slot. A small one takes
-// the slot it answers from. A medium one takes slots 1 and 2 when it answers from slot 1, slots 2 and 3 when it answers
-// from slot 3; when it answers from slot 2 it takes 1 and 2, unless slot 1 is taken by another module and 3 is free.
+// Where each module sits. A module answers from the slot of its tag, and says in its header where the tag is in the module (tagPositionOf), so it
+// starts at the slot it answers from minus that position plus one. A large module takes every slot, a small one the slot it answers from. When the
+// header gives a start that does not fit, a medium module takes slots 1 and 2 when it answers from slot 1, slots 2 and 3 when it answers from
+// slot 3, and when it answers from slot 2 slots 1 and 2, unless slot 1 is taken by another module and 3 is free.
 std::vector<PlacedModule> placeModules(const std::array<SlotInfo, SlotCount>& slots);
 
 // A module of three slots answers from slot 1 only: it fills the whole instrument. A module of one or two slots can answer from any slot,
 // because its tag may sit in either of its slots: a module of two slots on slots 2 and 3 can answer from slot 3.
 bool moduleMayAnswerFrom(int widthInSlots, int slot);
+
+// Where the tag sits in a module, counted from 1 at the left (byte 6 of the header; 0 counts as 1). The board says the slot in which it reads the
+// tag; the module starts there minus the tag position plus one. The Pro modules have their tag in the first slot, the Play modules in the third.
+int tagPositionOf(const Bytes& blob);
+
+// moduleMayAnswerFrom, knowing the type: the tag of a Play module is in its third slot, so it is announced from there.
+bool moduleTypeMayAnswerFrom(int type, int widthInSlots, int slot);
 
 // Decides when a scan of the slots counts as a change, so that the picture does not flicker. A scan that equals what is shown
 // changes nothing. A scan that differs has to be seen twice in a row, because one read can fail by chance, unless the board

@@ -135,6 +135,15 @@ bool LiveView::canLoadTemporarily() {
     return connected_ && !pushing_ && !pushJob_ && !temporaryJob_ && !tagJob_;
 }
 
+bool LiveView::newTagIn(int slot) {
+    std::shared_ptr<const Shown> shown;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        shown = shown_;
+    }
+    return slot >= 1 && slot <= joue::SlotCount && shown && shown->newTags[static_cast<std::size_t>(slot - 1)];
+}
+
 bool LiveView::playBoard() {
     int flags = limitations_;
     return flags >= 0 && joue::isPlayBoard(static_cast<std::uint32_t>(flags));
@@ -285,6 +294,8 @@ void LiveView::disconnect() {
     unreadable_ = {};
     unreadReason_ = {};
     shownUnreadable_ = {};
+    newTags_ = {};
+    shownNewTags_ = {};
     limitations_ = -1;
     filter_ = joue::SlotFilter();
     portMisses_ = 0;
@@ -404,6 +415,8 @@ bool LiveView::connect(std::string& error) {
         unreadable_ = {};
         unreadReason_ = {};
         shownUnreadable_ = {};
+        newTags_ = {};
+        shownNewTags_ = {};
         filter_ = joue::SlotFilter();
         scanner_->forget();
         connectedAtMs_ = nowMs();
@@ -436,6 +449,8 @@ void LiveView::apply(const std::array<joue::SlotInfo, joue::SlotCount>& slots) {
         if (!unreadable_[i].empty()) shown->unreadable.push_back({static_cast<int>(i) + 1, unreadable_[i]});
     }
     shownUnreadable_ = unreadable_;
+    shown->newTags = newTags_;
+    shownNewTags_ = newTags_;
     std::lock_guard<std::mutex> lock(mutex_);
     shown_ = shown;
     tracker_.setModules(shown->placed);
@@ -471,12 +486,13 @@ void LiveView::scanOnce(bool urgent) {
         for (int slot = 1; slot <= joue::SlotCount; ++slot) {
             std::size_t i = static_cast<std::size_t>(slot - 1);
             unreadable_[i].clear();
+            newTags_[i] = false;
             if (!announced.present(slot)) {
                 blobs_[i].clear();
                 blankStamp_[i] = 0;
                 continue;
             }
-            if (!joue::moduleMayAnswerFrom(joue::moduleSlots(announced.event(slot).type), slot)) {
+            if (!joue::moduleTypeMayAnswerFrom(announced.event(slot).type, joue::moduleSlots(announced.event(slot).type), slot)) {
                 // a module of three slots cannot answer from slot 2 or 3, nor one of two from slot 3: not a module that is there
                 blobs_[i].clear();
                 if (refusedStamp_[i] != announced.stamp(slot)) {
@@ -527,7 +543,8 @@ void LiveView::scanOnce(bool urgent) {
                 }
             }
             if (!blobs_[i].empty()) slots[i] = {true, blobs_[i]};
-            else if (blankStamp_[i] != announced.stamp(slot)) {
+            else if (blankStamp_[i] == announced.stamp(slot)) newTags_[i] = true;
+            else {
                 joue::ModuleEvent seen = announced.event(slot);
                 unreadable_[i] = joue::moduleName(seen.type) + " (type " + std::to_string(seen.type) + ", version " + std::to_string(seen.version) + ")";
             }
@@ -537,7 +554,7 @@ void LiveView::scanOnce(bool urgent) {
             fallback_ = false;
         }
         if (!virtualBlob.empty() && !slots[0].present) slots[0] = {true, virtualBlob};
-        if (filter_.offer(slots, true) || unreadable_ != shownUnreadable_) apply(filter_.accepted());
+        if (filter_.offer(slots, true) || unreadable_ != shownUnreadable_ || newTags_ != shownNewTags_) apply(filter_.accepted());
         return;
     }
     if (nowMs() - connectedAtMs_ < 4000.0) return;  // the board has not had time to announce its modules yet
@@ -941,7 +958,11 @@ void LiveView::drawPanel(float height) {
     ImGui::SameLine();
     ImGui::BeginChild("liveinfo", ImVec2(0, size.y), ImGuiChildFlags_None);
 
-    if (connected && shown->placed.empty() && shown->unreadable.empty()) ImGui::TextDisabled("%s", tr("No module."));
+    bool anyNewTag = shown->newTags[0] || shown->newTags[1] || shown->newTags[2];
+    if (connected && shown->placed.empty() && shown->unreadable.empty() && !anyNewTag) ImGui::TextDisabled("%s", tr("No module."));
+    for (int slot = 1; slot <= joue::SlotCount; ++slot) {
+        if (shown->newTags[static_cast<std::size_t>(slot - 1)]) ImGui::TextDisabled(tr("Slot %d: a new, blank tag (no module yet)."), slot);
+    }
     for (const joue::PlacedModule& m : shown->placed) {
         std::string slots = m.slots == 1 ? std::string(tr("Slot")) + " " + std::to_string(m.firstSlot) : std::string(tr("Slots")) + " " + std::to_string(m.firstSlot) + "-" + std::to_string(m.firstSlot + m.slots - 1);
         ImGui::Text(tr("%s: %s"), slots.c_str(), joue::moduleName(m.blob.header.type).c_str());

@@ -886,7 +886,9 @@ bool Designer::drawSlotState(int slot, bool erase) {
     bool allowed = false;
     if (kind == joue::TagKind::Empty) {
         color = erase ? amber : green;
-        std::snprintf(line, sizeof line, erase ? tr("Slot %d has no module: there is nothing to erase.") : tr("Slot %d has no module: a blank tag can be written here."), slot);
+        bool newTag = newTagIn && newTagIn(slot);
+        if (newTag) std::snprintf(line, sizeof line, erase ? tr("Slot %d holds a new, blank tag: there is nothing to erase. Write to it directly with Write to a tag.") : tr("Slot %d holds a new, blank tag: it can be written."), slot);
+        else std::snprintf(line, sizeof line, erase ? tr("Slot %d has no module: there is nothing to erase.") : tr("Slot %d has no module: a blank tag can be written here."), slot);
         allowed = !erase;
     } else if (kind == joue::TagKind::Manufacturer) {
         color = red;
@@ -941,11 +943,25 @@ void Designer::drawTagWindow() {
         if (ImGui::RadioButton(std::to_string(slot).c_str(), tagSlot_ == slot)) tagSlot_ = slot;
     }
     bool slotAllows = drawSlotState(tagSlot_, false);
+    bool fits = true;
+    if (design_.slots() >= 2) {
+        int position = std::max(1, static_cast<int>(design_.blob().header.reserved0));
+        int origin = tagSlot_ - position + 1;
+        fits = origin >= 1 && origin + design_.slots() - 1 <= 3;
+        char line[320];
+        if (fits) {
+            std::snprintf(line, sizeof line, tr("The tag is in slot %d: the module will sit on slots %d to %d."), tagSlot_, origin, origin + design_.slots() - 1);
+            ImGui::TextDisabled("%s", line);
+        } else {
+            std::snprintf(line, sizeof line, tr("With tag position %d, a module of %d slots whose tag is in slot %d would start at slot %d: it does not fit. Choose another slot, or change the tag position of the module."), position, design_.slots(), tagSlot_, origin);
+            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.4f, 1.0f), "%s", line);
+        }
+    }
     ImGui::Checkbox(tr("A blank tag is in this slot, and no module"), &tagConfirmed_);
     bool bad = false;
     for (const std::string& line : design_.problems()) bad = bad || line.rfind("Error", 0) == 0;
     bool ready = canWriteTag && canWriteTag();
-    ImGui::BeginDisabled(bad || !tagConfirmed_ || !ready || !slotAllows);
+    ImGui::BeginDisabled(bad || !tagConfirmed_ || !ready || !slotAllows || !fits);
     if (ImGui::Button(tr("Write the tag"))) {
         if (writeTag) writeTag(tagSlot_, design_.toBytes());
     }
@@ -1036,15 +1052,21 @@ void Designer::drawInspector() {
         design_.setSlots(slots);
     }
     ImGui::SetNextItemWidth(190 * scale);
-    if (ImGui::BeginCombo(tr("Type"), joue::moduleName(header.type).c_str())) {
+    std::string typeText = joue::isCustomModuleType(header.type) ? std::string(tr("Custom")) + " (" + std::to_string(header.type) + ")" : joue::moduleName(header.type);
+    if (ImGui::BeginCombo(tr("Type"), typeText.c_str())) {
         for (int t : KnownTypes) {
             if (ImGui::Selectable(joue::moduleName(t).c_str(), header.type == t)) {
                 pushUndo();
                 header.type = static_cast<std::uint8_t>(t);
             }
         }
+        if (ImGui::Selectable((std::string(tr("Custom")) + " (" + std::to_string(joue::CustomModuleType) + ")").c_str(), joue::isCustomModuleType(header.type))) {
+            pushUndo();
+            header.type = static_cast<std::uint8_t>(joue::CustomModuleType);
+        }
         ImGui::EndCombo();
     }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("A type of a manufacturer's module makes the other editors take your layout for that module (a Pro Area, for instance). Custom is a type that no module has: they show an unknown module. Untried on the instrument: if the board does not accept it, take a type from the list."));
     ImGui::SetNextItemWidth(70 * scale);
     int colorId = header.color;
     if (ImGui::InputInt(tr("Colour"), &colorId, 1, 1)) {
@@ -1061,9 +1083,9 @@ void Designer::drawInspector() {
     if (ImGui::IsItemActivated()) pushUndo();
     ImGui::SameLine();
     ImGui::SetNextItemWidth(70 * scale);
-    if (ImGui::InputInt(tr("Byte 6"), &byteSix, 0, 0)) header.reserved0 = static_cast<std::uint8_t>(std::max(0, std::min(255, byteSix)));
+    if (ImGui::InputInt(tr("Tag position"), &byteSix, 0, 0)) header.reserved0 = static_cast<std::uint8_t>(std::max(0, std::min(3, byteSix)));
     if (ImGui::IsItemActivated()) pushUndo();
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Not understood yet. Read from real modules: 0 on Pads and the Grand Fretboard, 1 on the Scaler and the\nGrand Clavier, 3 in the official Play module blobs. The Windows editor keeps whatever the module had."));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Where the tag sits in the module, counted from 1 at the left (0 counts as 1). The board says the slot in which it reads the tag, and the module starts at that slot minus this number plus one. The Pro modules have 1 (the Pads and the Grand Fretboard say 0, which counts the same), the Play modules 3."));
     bool mpe = (header.options & 0x01) != 0;
     if (ImGui::Checkbox(tr("MPE"), &mpe)) {
         pushUndo();

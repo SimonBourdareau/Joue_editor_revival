@@ -160,12 +160,13 @@ bool announcementMayBeNewTag(int type) { return type == 3; }
 TagKind classifyTag(const Bytes& blob) {
     if (blob.size() < InstrumentHeader::Length || blob[0] == 0 || looksLikeNewTag(blob)) return TagKind::Empty;
     const ModuleBindings* bindings = moduleBindings(blob[0]);
-    if (!bindings) return TagKind::Unknown;
+    if (!bindings && !isCustomModuleType(blob[0])) return TagKind::Unknown;
     try {
         ModuleBlob::parse(blob);
     } catch (const std::exception&) {
         return TagKind::Unknown;
     }
+    if (!bindings) return TagKind::Custom;
     return structureMatches(*bindings, blob) ? TagKind::Manufacturer : TagKind::Custom;
 }
 

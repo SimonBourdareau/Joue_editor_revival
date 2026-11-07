@@ -37,13 +37,15 @@ Click an element in the picture to see its **MIDI mapping** on the right.
 ## The live instrument
 
 1. **Quit the original Joué Editor** first: it holds the instrument's MIDI ports.
-2. Connect the Joué. The modules appear in their slots with the picture of their layout. A module of three slots answers from slot 1 only; a smaller one can answer from any slot, because its tag may sit in either of its slots. If a module you put in is not shown, open **Details** under the live instrument: the log says what the board announced and, when the layout could not be read, why. Send those lines when you report it.
+2. Connect the Joué. The modules appear in their slots with the picture of their layout. The board says the slot in which it reads the tag of a module, and the module starts at that slot minus its tag position plus one (the position is in the module itself: 1 on the Pro modules, whose tag is in their first slot, and 3 on the Play modules, whose tag is in their third). So a module of two slots on slots 2 and 3 is shown there, not on slots 1 and 2. If a module you put in is not shown, open **Details** under the live instrument: the log says what the board announced and, when the layout could not be read, why. Send those lines when you report it.
 3. **Touches** are drawn from the notes, pressure and controllers the instrument plays; they are not measured positions. The **octave** buttons on the picture correct the octave the program assumes.
 4. If something looks wrong, press **Rescan modules**, and open **Details** and its **Detection log**: they say what the board announced, what was read for each slot and why a read was refused.
 5. **Touch to select** (View menu, on by default): put a finger on the instrument and the editor selects that element, as a click on it would, in the open module when it is of the same kind as the module you touched (a Scaler preset, or a Scaler opened with Edit). Touching the temporary layout of the designer selects the element in the designer. It needs the Play port: see the next point.
 6. **View > Listen to the Play port (touches)** off: the program no longer holds the Play port (use it if a MIDI monitor or a synthesizer stops getting the notes), and no touches are drawn.
 
 A module that the board announces but whose layout cannot be read is listed in orange (*detected, but its layout could not be read*); the reason is in the **Detection log**. If the Joué is in firmware update mode the program says so, instead of *No Joué found*: update it with the Joué firmware updater first. On a **Joué Play** board (one without the Pro firmware) the editor reads and shows the modules but cannot change them: uploading, writing and erasing a tag and the temporary layout are disabled, with a message. This has not been tried on a real Play board.
+
+A new, blank tag in a slot is not a module: the panel lists it as *a new, blank tag (no module yet)*, **Erase a tag...** says there is nothing to erase, and **Write to a tag...** writes to it directly. Only a tag that holds a custom layout is erased. If the panel says nothing for a slot where you put a tag, open **View > Device information...**: the line *Tag in slot N* says whether the board sees a tag there at all.
 
 ## Editing the module that is in the instrument
 
