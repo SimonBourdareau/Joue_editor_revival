@@ -105,6 +105,7 @@ The data folder is `%APPDATA%\JoueEditorNG` on Windows, `~/Library/Application S
 | A module is missing or in the wrong slot | **Rescan modules**; read the **Detection log**. |
 | The upload and tag buttons are greyed, with a message about a Joué Play | The board is a Play board: it cannot change modules, a Joué Pro is needed. |
 | A module is listed in orange: *detected, but its layout could not be read* | Open **Details**, **Detection log**, and send the lines for that slot when you report it. |
+| The panel is slow to show a change, or stays in its previous state for some seconds | A module that the board announces but whose layout cannot be read is tried three times, then again every few seconds, so that it does not hold up the other slots. Take it off and put it back flat: the board announces it again and it is read at once. A module that is not seated flat can lose its tag: **View > Device information...**, **Read again**, and look at *Tag in slot N*. |
 | Another program gets no notes | Switch off **View > Listen to the Play port**. |
 | macOS says the app is damaged or from an unknown developer | `xattr -cr "Joue Revival.app"`, or right click, **Open**. |
 | Windows SmartScreen warns | **More info**, **Run anyway**: the file is not signed. |

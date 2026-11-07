@@ -296,6 +296,9 @@ void LiveView::disconnect() {
     shownUnreadable_ = {};
     newTags_ = {};
     shownNewTags_ = {};
+    readTries_ = {};
+    nextTryMs_ = {};
+    triedStamp_ = {};
     limitations_ = -1;
     filter_ = joue::SlotFilter();
     portMisses_ = 0;
@@ -399,10 +402,9 @@ bool LiveView::connect(std::string& error) {
         havePlayPair_ = play >= 0;
         if (havePlayPair_) playPair_ = mine[static_cast<std::size_t>(play)];
         bool touches = listenToPlay && openPlay();
-        auto hardware = device_->hardwareId();
-        auto limits = device_->hardwareLimitations();
-        limitations_ = limits ? static_cast<int>(*limits) : -1;
-        if (limits && joue::isPlayBoard(*limits)) note("the board is a Play board: its modules can be read but not changed");
+        auto hardware = device_->hardwareInfo();
+        limitations_ = hardware ? static_cast<int>(hardware->limitations) : -1;
+        if (hardware && joue::isPlayBoard(hardware->limitations)) note("the board is a Play board: its modules can be read but not changed");
         {
             std::lock_guard<std::mutex> lock(mutex_);
             announced_.clear();
@@ -417,13 +419,16 @@ bool LiveView::connect(std::string& error) {
         shownUnreadable_ = {};
         newTags_ = {};
         shownNewTags_ = {};
+        readTries_ = {};
+        nextTryMs_ = {};
+        triedStamp_ = {};
         filter_ = joue::SlotFilter();
         scanner_->forget();
         connectedAtMs_ = nowMs();
         // like the official application: ask the board to announce every module again, then trust what it announces
         device_->updateModuleList();
         std::lock_guard<std::mutex> lock(mutex_);
-        isPlay_ = hardware && ((*hardware >> 8) & 1) != 0;
+        isPlay_ = hardware && joue::isPlayBoard(hardware->limitations);
         touchesAvailable_ = touches;
         tracker_.clear();
         messages_ = 0;
@@ -482,6 +487,18 @@ void LiveView::scanOnce(bool urgent) {
     }
     std::array<joue::SlotInfo, joue::SlotCount> slots;
     if (announced.any()) {
+        {
+            // a read can take seconds when a tag is hard to read: what is already known is shown first, so that a module taken off or put on
+            // elsewhere does not wait for it
+            std::array<joue::SlotInfo, joue::SlotCount> known;
+            for (int slot = 1; slot <= joue::SlotCount; ++slot) {
+                std::size_t k = static_cast<std::size_t>(slot - 1);
+                if (announced.present(slot) && !blobs_[k].empty() && blobStamp_[k] == announced.stamp(slot)) known[k] = {true, blobs_[k]};
+            }
+            if (!virtualBlob.empty() && !known[0].present) known[0] = {true, virtualBlob};
+            if (filter_.offer(known, true)) apply(filter_.accepted());
+        }
+        bool retrySoon = false;
         // the board says which slots hold a module; a blob is read only for those, and again only for a new insertion
         for (int slot = 1; slot <= joue::SlotCount; ++slot) {
             std::size_t i = static_cast<std::size_t>(slot - 1);
@@ -502,15 +519,22 @@ void LiveView::scanOnce(bool urgent) {
                 continue;
             }
             if ((blobs_[i].empty() || blobStamp_[i] != announced.stamp(slot)) && blankStamp_[i] != announced.stamp(slot)) {
-                blobs_[i].clear();
-                client_->setTimeout(std::chrono::milliseconds(2500));
-                joue::ModuleEvent event = announced.event(slot);
-                // a read of a slot can hand back the module of another one: what is kept for a slot must be the type of
-                // module the board announced there, and a read that is not is made again
-                std::string head = "nothing read";
-                std::string reason = "no answer";
-                for (int attempt = 0; attempt < 3 && blobs_[i].empty(); ++attempt) {
+                if (triedStamp_[i] != announced.stamp(slot)) {
+                    triedStamp_[i] = announced.stamp(slot);
+                    readTries_[i] = 0;
+                    nextTryMs_[i] = 0;
+                }
+                if (nowMs() >= nextTryMs_[i]) {
+                    blobs_[i].clear();
+                    client_->setTimeout(std::chrono::milliseconds(readTries_[i] == 0 ? 2500 : 1500));
+                    joue::ModuleEvent event = announced.event(slot);
+                    // a read of a slot can hand back the module of another one: what is kept for a slot must be the type of
+                    // module the board announced there, and a read that is not is made again
+                    std::string head = "nothing read";
+                    std::string reason = "no answer";
+                    auto readStarted = std::chrono::steady_clock::now();
                     auto blob = device_->readModule(slot);
+                    bool timedOut = !blob && std::chrono::duration<double>(std::chrono::steady_clock::now() - readStarted).count() >= 1.0;
                     if (blob && !blob->empty()) {
                         head = hexHead(*blob);
                         reason = "a short answer of " + std::to_string(blob->size()) + " bytes";
@@ -518,33 +542,36 @@ void LiveView::scanOnce(bool urgent) {
                     if (blob && joue::looksLikeNewTag(*blob) && joue::announcementMayBeNewTag(event.type)) {
                         blankStamp_[i] = announced.stamp(slot);
                         note("slot " + std::to_string(slot) + ": a new tag, not a module (first bytes " + hexHead(*blob) + ": the empty NDEF message of a new NTAG, which the board reads as Bubbles)");
-                        break;
-                    }
-                    if (blob && blob->size() >= joue::InstrumentHeader::Length) {
+                    } else if (blob && blob->size() >= joue::InstrumentHeader::Length) {
                         try {
                             joue::ModuleBlob::parse(*blob);
                             if (joue::blobFitsAnnouncement(*blob, event)) {
                                 blobs_[i] = *blob;
                                 blobStamp_[i] = announced.stamp(slot);
-                                note("slot " + std::to_string(slot) + ": layout read, " + joue::moduleName(event.type) + ", " + std::to_string(blob->size()) + " bytes" + (joue::announcementMayBeNewTag(event.type) ? ", first bytes " + hexHead(*blob) : std::string()));
+                                note("slot " + std::to_string(slot) + ": layout read, " + joue::moduleName(event.type) + ", " + std::to_string(blob->size()) + " bytes" + (joue::announcementMayBeNewTag(event.type) ? " (announced as a Bubbles: a module with a layout)" : ""));
                             } else {
+                                reason = "a read gave a " + joue::moduleName((*blob)[0]) + " but the board announced a " + joue::moduleName(event.type);
                                 note("slot " + std::to_string(slot) + ": a read gave a " + joue::moduleName((*blob)[0]) + " but the board announced a " + joue::moduleName(event.type) + "; it was not kept");
                             }
                         } catch (const std::exception& error) {
                             reason = std::string(error.what()) + " (" + std::to_string(blob->size()) + " bytes read)";
                         }
                     }
-                    if (blobs_[i].empty() && attempt < 2) std::this_thread::sleep_for(std::chrono::milliseconds(300));
-                }
-                unreadReason_[i] = reason;
-                if (blobs_[i].empty() && blankStamp_[i] != announced.stamp(slot) && refusedStamp_[i] != announced.stamp(slot)) {
-                    refusedStamp_[i] = announced.stamp(slot);
-                    note("slot " + std::to_string(slot) + ": no layout that fits the announcement could be read (first bytes " + head + "; " + reason + "); the module is not shown (try Rescan modules)");
+                    if (blobs_[i].empty() && blankStamp_[i] != announced.stamp(slot)) {
+                        ++readTries_[i];
+                        nextTryMs_[i] = nowMs() + joue::readRetryDelayMs(readTries_[i], timedOut);
+                        unreadReason_[i] = reason;
+                        if (readTries_[i] < joue::ReadTriesBeforeGivingUp && !timedOut) retrySoon = true;
+                        else if (readTries_[i] == joue::ReadTriesBeforeGivingUp && refusedStamp_[i] != announced.stamp(slot)) {
+                            refusedStamp_[i] = announced.stamp(slot);
+                            note("slot " + std::to_string(slot) + ": no layout that fits the announcement could be read (first bytes " + head + "; " + reason + "); the module is not shown, and the program looks again every few seconds (or use Rescan modules)");
+                        }
+                    }
                 }
             }
             if (!blobs_[i].empty()) slots[i] = {true, blobs_[i]};
             else if (blankStamp_[i] == announced.stamp(slot)) newTags_[i] = true;
-            else {
+            else if (readTries_[i] >= joue::ReadTriesBeforeGivingUp) {
                 joue::ModuleEvent seen = announced.event(slot);
                 unreadable_[i] = joue::moduleName(seen.type) + " (type " + std::to_string(seen.type) + ", version " + std::to_string(seen.version) + ")";
             }
@@ -555,6 +582,11 @@ void LiveView::scanOnce(bool urgent) {
         }
         if (!virtualBlob.empty() && !slots[0].present) slots[0] = {true, virtualBlob};
         if (filter_.offer(slots, true) || unreadable_ != shownUnreadable_ || newTags_ != shownNewTags_) apply(filter_.accepted());
+        if (retrySoon) {
+            // the next try of a layout that could not be read yet comes soon, not after the two seconds of a normal scan
+            std::lock_guard<std::mutex> lock(mutex_);
+            lastScanMs_ = nowMs() - 2000.0 + joue::readRetryDelayMs(1) + 100.0;
+        }
         return;
     }
     if (nowMs() - connectedAtMs_ < 4000.0) return;  // the board has not had time to announce its modules yet
@@ -675,6 +707,9 @@ void LiveView::workerMain() {
                 blobs_ = {};
                 blankStamp_ = {};
                 refusedStamp_ = {};
+                readTries_ = {};
+                nextTryMs_ = {};
+                triedStamp_ = {};
                 try {
                     client_->setTimeout(std::chrono::milliseconds(2500));
                     device_->updateModuleList();

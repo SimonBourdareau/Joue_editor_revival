@@ -24,8 +24,10 @@ std::string versionAndBuild(const std::optional<std::uint32_t>& version, const s
 
 DeviceInfo readDeviceInfo(Device& device) {
     DeviceInfo info;
-    info.hardwareId = device.hardwareId();
-    info.hardwareLimitations = device.hardwareLimitations();
+    if (auto hardware = device.hardwareInfo()) {
+        info.hardwareId = hardware->id;
+        info.hardwareLimitations = hardware->limitations;
+    }
     info.touchHardwareId = device.touchHardwareId();
     info.firmwareVersion = device.firmwareVersion();
     info.touchVersion = device.touchVersion();

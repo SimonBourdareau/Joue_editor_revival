@@ -33,6 +33,15 @@ std::vector<PlacedModule> placeModules(const std::array<SlotInfo, SlotCount>& sl
 // because its tag may sit in either of its slots: a module of two slots on slots 2 and 3 can answer from slot 3.
 bool moduleMayAnswerFrom(int widthInSlots, int slot);
 
+// When a layout cannot be read, the read is tried again later, not at once and not forever: after a failed try number n (1 for the first), the
+// pause in milliseconds before the next one. The first three tries follow each other quickly, since a tag that has just been put on the
+// instrument is often not ready; then the program only looks again every few seconds, so that a tag that cannot be read does not keep the
+// panel from showing the changes of the other slots. A slot that does not answer at all (the read timed out) is not tried again quickly, since
+// waiting does not help it, and less and less often: a new insertion, or Rescan modules, starts again at once.
+double readRetryDelayMs(int failedTries, bool timedOut = false);
+// The layout is declared unreadable (and shown so) after this many failed tries.
+constexpr int ReadTriesBeforeGivingUp = 3;
+
 // Where the tag sits in a module, counted from 1 at the left (byte 6 of the header; 0 counts as 1). The board says the slot in which it reads the
 // tag; the module starts there minus the tag position plus one. The Pro modules have their tag in the first slot, the Play modules in the third.
 int tagPositionOf(const Bytes& blob);

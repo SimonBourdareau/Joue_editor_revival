@@ -51,6 +51,13 @@ bool moduleMayAnswerFrom(int widthInSlots, int slot) {
     return slot >= 1 && slot <= SlotCount;
 }
 
+double readRetryDelayMs(int failedTries, bool timedOut) {
+    if (timedOut) return failedTries < 2 ? 3000.0 : (failedTries < 3 ? 6000.0 : (failedTries < 4 ? 10000.0 : 15000.0));
+    if (failedTries < ReadTriesBeforeGivingUp) return 300.0;
+    if (failedTries < 5) return 3000.0;
+    return 5000.0;
+}
+
 int tagPositionOf(const Bytes& blob) { return blob.size() > 6 ? std::max(1, static_cast<int>(blob[6])) : 1; }
 
 bool moduleTypeMayAnswerFrom(int type, int widthInSlots, int slot) {

@@ -45,7 +45,7 @@ Cliquez sur un élément de l'image pour voir son **Affectation MIDI** à droite
 
 Un module que la carte annonce mais dont la disposition ne peut pas être lue est affiché en orange (*détecté, mais sa disposition n'a pas pu être lue*) ; la raison est dans le **Journal de détection**. Si le Joué est en mode de mise à jour du micrologiciel, le programme le dit, au lieu de *Aucun Joué trouvé* : mettez-le d'abord à jour avec l'outil de mise à jour Joué. Sur une carte **Joué Play** (sans le micrologiciel Pro), l'éditeur lit et montre les modules mais ne peut pas les modifier : l'envoi, l'écriture et l'effacement d'une puce et la disposition temporaire sont désactivés, avec un message. Cela n'a pas été essayé sur une vraie carte Play.
 
-Une puce neuve et vierge dans un emplacement n'est pas un module : le panneau l'indique comme *une puce neuve, vierge (pas encore de module)*, **Effacer une puce...** dit qu'il n'y a rien à effacer, et **Écrire sur une puce...** écrit directement dessus. Seule une puce qui contient une disposition personnalisée est effacée. Si le panneau ne dit rien pour un emplacement où vous avez posé une puce, ouvrez **Affichage > Informations sur l'appareil...** : la ligne *Puce dans l'emplacement N* dit si la carte voit une puce à cet endroit.
+Une puce neuve et vierge dans un emplacement n'est pas un module : le panneau l'indique comme *une puce neuve, vierge (pas encore de module)*, **Effacer une puce...** dit qu'il n'y a rien à effacer, et **Écrire sur une puce...** écrit directement dessus. Seule une puce qui contient une disposition personnalisée est effacée. Si le panneau ne dit rien pour un emplacement où vous avez posé une puce, ouvrez **Affichage > Informations sur l'appareil...** : la ligne *Puce de l'emplacement N* dit si la carte voit une puce à cet endroit.
 
 ## Modifier le module qui est dans l'instrument
 
@@ -105,6 +105,7 @@ Le dossier de données est `%APPDATA%\JoueEditorNG` sous Windows, `~/Library/App
 | Un module manque ou est dans le mauvais emplacement | **Réanalyser les modules** ; lire le **Journal de détection**. |
 | Les boutons d'envoi et de puce sont grisés, avec un message sur un Joué Play | La carte est une carte Play : elle ne peut pas modifier les modules, il faut un Joué Pro. |
 | Un module est affiché en orange : *détecté, mais sa disposition n'a pas pu être lue* | Ouvrir **Détails**, **Journal de détection**, et envoyer les lignes de cet emplacement en le signalant. |
+| Le panneau est lent à montrer un changement, ou reste dans son état précédent quelques secondes | Un module que la carte annonce mais dont la disposition ne peut pas être lue est essayé trois fois, puis de nouveau toutes les quelques secondes, pour qu'il ne retarde pas les autres emplacements. Retirez-le et remettez-le bien à plat : la carte l'annonce de nouveau et il est lu tout de suite. Un module mal posé à plat peut perdre sa puce : **Affichage > Informations sur l'appareil...**, **Relire**, et regardez *Puce de l'emplacement N*. |
 | Un autre programme ne reçoit pas les notes | Désactiver **Affichage > Écouter le port Play**. |
 | macOS dit que l'application est endommagée ou d'un développeur inconnu | `xattr -cr "Joue Revival.app"`, ou clic droit, **Ouvrir**. |
 | Windows SmartScreen avertit | **Informations complémentaires**, **Exécuter quand même** : le fichier n'est pas signé. |
