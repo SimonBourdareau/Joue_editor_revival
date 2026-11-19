@@ -54,8 +54,7 @@ Download `joue-revival-linux-x86_64.AppImage`, make it executable (`chmod +x jou
 ## What you can do with Joué Revival
 
 - **Browse and edit libraries:** the factory presets (loaded at the first start; locked, and not deletable), your own folders and copies, saved with a backup of the previous file.
-- **Mackie Control presets for the other modules (mostly untried):** one preset for each of eleven modules, in the library folder **Mackie presets** (below the Play presets, open at start, with the Scaler mixer preset), make the Pro Matrix, Strips, Rounds, Bubbles, Grand Clavier, Synth, Play Piano, Play Drum, Play Audio and Play Keys send Mackie Control messages; the Matrix and the Grand Clavier were checked against real module data, the others only against the program's tables (see [docs/mackie-presets.md](docs/mackie-presets.md)).
-- **Try the Scaler as a Mackie Control mixing surface (preview):** the Scaler mixer preset and the Mackie Control window send Mackie Control messages to a DAW through a MIDI port that the program makes itself (or two ports you choose); no real DAW has been tried yet. See [docs/mixer-bridge.md](docs/mixer-bridge.md).
+- **Use the instrument as a Mackie Control surface (preview):** see [Mackie Control](#mackie-control).
 - **See the instrument live:** the modules in the slots, the touches, the octave of the keys; **touch to select**, which selects in the editor the element your finger is on; **Rescan modules** and a detection log when something looks wrong.
 - **Edit a module in the instrument:** the Action of buttons and pads, notes, scales (23 of the original and 47 more), the bubble, the Y control, pressure range, MPE and aftertouch; then upload the changes, or restore the original. A module with a custom layout opens in the module designer instead.
 - **Upload a preset to a module** of the same type, with the list of what will change; **compare** two presets, or a preset with the module in the instrument, without writing anything.
@@ -67,13 +66,13 @@ See the [User guide](docs/user-guide.md) for the windows, the files and troubles
 
 ## Mackie Control
 
-Joué Revival can make the instrument a control surface for a DAW that speaks Mackie Control, such as Bitwig Studio or Ableton Live. This is a preview: the Scaler mixer preset has been tried with Bitwig, the other presets have not been tried on a real module.
+Joué Revival can make the instrument a control surface for a DAW that speaks Mackie Control (Bitwig Studio, Ableton Live, Reaper...). It is a preview: the Scaler and Grand Clavier presets have been tried with Bitwig on Windows, the other presets not yet on a real module.
 
-- **The Mackie Control window** (**View > Mackie Control...**) translates the Scaler into a mixing surface (master and 8 faders, fine, shift, transport, solo, mute, arm, pan, banks, three fader modes), and for the other modules draws the module itself, each control with what it does, lit when pressed, with the lamps and faders of the DAW.
-- **One preset for each module**, named *Mackie Control: <module>*, in the library folder **Mackie presets** (below the Play presets). A module that runs one is marked in red next to **Edit** in the live instrument, and putting it on the instrument switches Mackie Control on, opens its window and opens the MIDI port.
-- **Its own MIDI port**, `Joue Mackie`, made by the program: on Windows it uses the driver that loopMIDI installs (install loopMIDI once, no port to create), on macOS and Linux the system's virtual ports. Ports that already exist can be used instead.
-- **The module designer** makes pads for Mackie Control too (**Generate > Mackie Control...**): arm, solo, mute and select, transport, banks, cursors. A module designed that way is recognised by the Mackie Control window.
-- The guides: the [Mackie Control guide](docs/mixer-bridge.md) and the [Mackie Control presets](docs/mackie-presets.md), also in the **Help** menu.
+- **One preset per module**, *Mackie Control: <module>*, in the library folder **Mackie presets**: the Scaler becomes a mixer (master and 8 faders, transport, solo, mute, arm, pan, banks), the other modules send Mackie buttons and faders.
+- **The Mackie Control window** (**View > Mackie Control...**) opens by itself when such a module is on the instrument, and shows the module, what it sends and what the DAW answers.
+- **Its own MIDI port**, `Joue Mackie`, made by the program (on Windows, install loopMIDI once for its driver).
+- **The module designer** makes Mackie Control pads (**Generate > Mackie Control...**).
+- Read the [Mackie Control guide](docs/mixer-bridge.md), also in the **Help** menu.
 
 ## Reporting a bug
 

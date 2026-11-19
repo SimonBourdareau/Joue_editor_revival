@@ -6,6 +6,6 @@ Joué Revival loads it by itself the first time it starts, and **File > Open the
 
 These presets come from the manufacturer's application. They are included so that the program works at once; they are not covered by the GNU GPL of the program.
 
-# Scaler mixer
+# Mackie Control presets
 
-`scaler-mixer.xml` is a library with one preset, *Mackie Control: Scaler*: the Pro Scaler with other notes and controller numbers, for the mixer bridge (see `docs/mixer-bridge.md`). Import it with **File > Import presets**. It comes from the Pro Scaler factory preset, so the same remark applies: the settings of the module are the manufacturer's; the notes and controller numbers are the author's.
+`mackie-presets.xml` and `scaler-mixer.xml` hold the Mackie Control presets, one for each kind of module, all named *Mackie Control: <module>* (see `docs/mixer-bridge.md`). The program reads them at every start and shows them, locked, in the library folder **Mackie presets**: there is nothing to import. They come from the factory presets of the manufacturer's application, so the same remark applies: the settings of the module are the manufacturer's; the notes and controller numbers are the author's.

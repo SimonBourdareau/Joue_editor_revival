@@ -57,8 +57,7 @@ Téléchargez `joue-revival-linux-x86_64.AppImage`, rendez-le exécutable (`chmo
 
 - **Parcourir et modifier des bibliothèques :** les préréglages d'usine (chargés au premier démarrage ; verrouillés, et non supprimables), vos propres dossiers et copies, enregistrés avec une sauvegarde du fichier précédent.
 - **Chercher, importer et exporter des préréglages :** une zone de recherche au-dessus de la bibliothèque ; **Fichier > Importer des préréglages...** ajoute les préréglages d'un autre fichier de bibliothèque ; **Fichier > Exporter mes préréglages...** écrit les vôtres pour les partager.
-- **Préréglages Mackie Control pour les autres modules (surtout non essayés) :** un préréglage pour chacun de onze modules, dans le dossier **Mackie presets** de la bibliothèque (sous les préréglages Play, ouvert au démarrage, avec le préréglage de mixage du Scaler), font envoyer des messages Mackie Control au Pro Matrix, Strips, Rounds, Bubbles, Grand Clavier, Synth, Play Piano, Play Drum, Play Audio et Play Keys ; le Matrix et le Grand Clavier ont été vérifiés avec de vraies données de module, les autres seulement avec les tables du programme (voir [docs/mackie-presets.fr.md](docs/mackie-presets.fr.md)).
-- **Essayer le Scaler comme surface de mixage Mackie Control (aperçu) :** le préréglage Scaler de mixage et la fenêtre Mackie Control envoient des messages Mackie Control à un DAW par un port MIDI que le programme crée lui-même (ou deux ports que vous choisissez) ; aucun vrai DAW n'a encore été essayé. Voir [docs/mixer-bridge.fr.md](docs/mixer-bridge.fr.md).
+- **Utiliser l'instrument comme surface Mackie Control (aperçu) :** voir [Mackie Control](#mackie-control).
 - **Voir l'instrument en direct :** les modules dans les emplacements, les contacts, l'octave des touches ; **toucher pour sélectionner**, qui sélectionne dans l'éditeur l'élément sur lequel est votre doigt ; **Réanalyser les modules** et un journal de détection quand quelque chose semble faux.
 - **Modifier un module de l'instrument :** l'Action des boutons et des pads, les notes, les gammes (23 de l'original et 47 autres), la bulle, le contrôle Y, la plage de pression, le MPE et l'aftertouch ; puis envoyer les modifications, ou restaurer l'original. Un module qui a une disposition personnalisée s'ouvre à la place dans le concepteur de modules.
 - **Envoyer un préréglage à un module** du même type, avec la liste de ce qui va changer ; **comparer** deux préréglages, ou un préréglage avec le module de l'instrument, sans rien écrire.
@@ -70,13 +69,13 @@ Voir le [Guide de l'utilisateur](docs/user-guide.fr.md) pour les fenêtres, les 
 
 ## Mackie Control
 
-Joué Revival peut faire de l'instrument une surface de contrôle pour un DAW qui parle Mackie Control, comme Bitwig Studio ou Ableton Live. C'est un aperçu : le préréglage de mixage du Scaler a été essayé avec Bitwig, les autres préréglages n'ont pas été essayés sur un vrai module.
+Joué Revival peut faire de l'instrument une surface de contrôle pour un DAW qui parle Mackie Control (Bitwig Studio, Ableton Live, Reaper...). C'est un aperçu : les préréglages du Scaler et du Grand Clavier ont été essayés avec Bitwig sous Windows, les autres pas encore sur un vrai module.
 
-- **La fenêtre Mackie Control** (**Affichage > Mackie Control...**) traduit le Scaler en surface de mixage (master et 8 faders, fin, maj, transport, solo, mute, armement, panoramique, banques, trois modes de fader), et pour les autres modules dessine le module lui-même, chaque commande avec ce qu'elle fait, allumée quand elle est pressée, avec les voyants et les faders du DAW.
-- **Un préréglage par module**, nommé *Mackie Control: <module>*, dans le dossier **Mackie presets** de la bibliothèque (sous les préréglages Play). Un module qui en utilise un est marqué en rouge à côté de **Modifier** dans l'instrument en direct, et le poser sur l'instrument active Mackie Control, ouvre sa fenêtre et ouvre le port MIDI.
-- **Son propre port MIDI**, `Joue Mackie`, créé par le programme : sous Windows il utilise le pilote qu'installe loopMIDI (installez loopMIDI une fois, aucun port à créer), sous macOS et Linux les ports virtuels du système. On peut utiliser à la place des ports qui existent déjà.
-- **Le concepteur de modules** fait aussi des pads pour Mackie Control (**Générer > Mackie Control...**) : armement, solo, mute et sélection, transport, banques, curseurs. Un module conçu ainsi est reconnu par la fenêtre Mackie Control.
-- Les guides : le [Guide de Mackie Control](docs/mixer-bridge.fr.md) et les [Préréglages Mackie Control](docs/mackie-presets.fr.md), aussi dans le menu **Aide**.
+- **Un préréglage par module**, *Mackie Control: <module>*, dans le dossier **Mackie presets** de la bibliothèque : le Scaler devient une table de mixage (master et 8 faders, transport, solo, mute, armement, panoramique, banques), les autres modules envoient des boutons et des faders Mackie.
+- **La fenêtre Mackie Control** (**Affichage > Mackie Control...**) s'ouvre toute seule quand un tel module est sur l'instrument, et montre le module, ce qu'il envoie et ce que répond le DAW.
+- **Son propre port MIDI**, `Joue Mackie`, créé par le programme (sous Windows, installez loopMIDI une fois pour son pilote).
+- **Le concepteur de modules** fait des pads Mackie Control (**Générer > Mackie Control...**).
+- Lisez le [Guide de Mackie Control](docs/mixer-bridge.fr.md), aussi dans le menu **Aide**.
 
 ## Signaler un bogue
 

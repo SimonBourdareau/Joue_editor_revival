@@ -22,7 +22,7 @@ cp packaging/linux/joue-revival.desktop "$app/joue-revival.desktop"
 cp cpp/app/icons/joue-revival-1024.png "$app/joue-revival.png"
 cp docs/README-linux.md "$app/usr/share/doc/joue-revival/README.md"
 cp docs/README-linux.fr.md "$app/usr/share/doc/joue-revival/README.fr.md"
-cp docs/user-guide.md docs/mixer-bridge.md docs/mixer-bridge.fr.md docs/mackie-presets.md docs/mackie-presets.fr.md docs/user-guide.fr.md docs/module-designer.md docs/module-designer.fr.md docs/editor-preview.png docs/designer-preview.png docs/editor-preview-fr.png docs/designer-preview-fr.png LICENSE "$app/usr/share/doc/joue-revival/"
+cp docs/user-guide.md docs/mixer-bridge.md docs/mixer-bridge.fr.md docs/user-guide.fr.md docs/module-designer.md docs/module-designer.fr.md docs/editor-preview.png docs/designer-preview.png docs/editor-preview-fr.png docs/designer-preview-fr.png LICENSE "$app/usr/share/doc/joue-revival/"
 printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/usr/bin/joue_editor" "$@"\n' > "$app/AppRun"
 chmod +x "$app/AppRun"
 APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$arch" "$tool" "$app" "$out/joue-revival-linux-$arch.AppImage" >&2

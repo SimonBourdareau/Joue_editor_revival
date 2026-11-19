@@ -1,88 +1,74 @@
-# Mackie Control (aperçu)
+# Mackie Control
 
-Le Scaler a dix-sept touches, deux boutons, une bulle et une bande : de quoi faire une petite surface de mixage. Le programme transforme ce que le Scaler envoie en messages **Mackie Control**, le protocole que Bitwig, Ableton Live, Logic, Reaper et d'autres comprennent pour les faders, le transport et les noms de pistes.
+Joué Revival peut faire de l'instrument une surface de contrôle pour un DAW qui parle **Mackie Control** (Bitwig Studio, Ableton Live, Reaper, Logic...) : faders, transport, solo, mute, armement, panoramique, banques et noms de pistes. C'est un **aperçu** : les préréglages du Scaler et du Grand Clavier ont été essayés avec Bitwig sous Windows ; les autres n'ont pas été essayés sur un vrai module.
 
-**État : aperçu.** Le préréglage Scaler de mixage, la traduction et la connexion à un DAW par deux ports MIDI existent, et sont testés ici avec des messages synthétiques et des ports simulés. **Aucun vrai DAW et aucun Scaler avec le préréglage n'a encore été essayé avec.** La fenêtre Mackie Control montre ce qui est envoyé et ce que le DAW répond.
+## Démarrage rapide
 
-## Le préréglage Scaler de mixage
+1. Dans la bibliothèque, ouvrez le dossier **Mackie presets** (sous les préréglages d'usine Play), choisissez *Mackie Control: <votre module>*, posez le module sur l'instrument et appuyez sur **Envoyer vers le Joué...**. Les préréglages sont verrouillés ; **Dupliquer** en fait une copie modifiable.
+2. Le programme active alors Mackie Control, ouvre sa fenêtre et ouvre le port MIDI **Joue Mackie**. À la main : **Affichage > Mackie Control...**, puis **Connecter**.
+3. Dans le DAW, ajoutez un contrôleur Mackie Control et réglez son entrée et sa sortie MIDI sur **Joue Mackie**. Dans Bitwig : **Settings > Controllers > Add controller > Mackie > Mackie Control**. Faites-le après l'étape 2 : le DAW ne liste le port qu'une fois qu'il existe.
+4. La fenêtre montre ce que le module envoie et ce que répond le DAW ; les lignes en orange viennent du DAW.
 
-`presets/scaler-mixer.xml` est un fichier de bibliothèque avec un préréglage, *Mackie Control: Scaler*. Importez-le avec **Fichier > Importer des préréglages...**, sélectionnez-le dans le dossier qu'il crée, et **Envoyer vers le Joué...** avec le Scaler sur l'emplacement 1. L'envoi écrit dans la puce du Scaler lui-même : il transforme les deux boutons en boutons de notes (les boutons d'octave sont remplacés), donne aux touches une affectation personnalisée des notes 36 à 52, et donne à chaque touche, à la bulle et à la bande leurs propres numéros de contrôleur. Les numéros n'ont pas changé d'une version du pont à l'autre, donc un Scaler qui porte déjà le préréglage n'a pas besoin d'être renvoyé quand Mackie Control change ce qu'il en fait. **Restaurer la disposition précédente...** remet le Scaler comme il était. Une carte Joué Play ne peut pas écrire dans les modules.
+**Ports.**
 
-| Scaler | Envoie | Mackie Control envoie au DAW |
-|---|---|---|
-| Touche 1 (la plus à gauche) | note 36, contrôleur 14 (position le long de la touche) | fader master : note de contact 112, pitch bend sur le canal 9 |
-| Touches 2 à 9 | notes 37 à 44, contrôleurs 15 à 22 | faders 1 à 8 : notes de contact 104 à 111, pitch bend sur les canaux 1 à 8 |
-| Touche 10, **FIN** (FINE) | note 45 | tenue pendant qu'un fader est touché, le fader ne bouge que d'un quart du mouvement du doigt (la fraction se règle) |
-| Touche 11, **MAJ** (SHIFT) | note 46 | tenue, les touches 12 à 17 donnent leur deuxième fonction |
-| Touches 12 à 17 | notes 47 à 52 | stop (93), retour rapide (91), avance rapide (92), puis solo, mute et armement de la piste sélectionnée (notes 8, 16 et 0 plus la piste). Avec maj : cycle ou boucle (86), drop ou punch (87), annuler (81), rétablir (annuler avec maj tenue), le mode des faders (rien n'est envoyé) et métronome (89) |
-| Bouton 1 et bouton 2 (les deux de droite) | notes 94, 95 | lecture et enregistrement : notes 94 et 95, vélocité 127 appuyé et 0 relâché |
-| Bande | contrôleur 83 (absolu) | molette de jog : contrôleur 60, valeurs 1 à 63 vers la droite, 65 à 127 vers la gauche |
-| Bulle | contrôleurs 80 (X), 81 (Y), 82 (pression) | gauche et droite : le panoramique de la piste sélectionnée (le V-pot, contrôleurs 16 à 23, deux crans par pas, répété vite) ; haut et bas : banque à gauche et à droite, donc haut va vers les pistes précédentes et bas vers les suivantes. Chacun peut être réglé sur autre chose, ou sur rien |
+- **Windows :** installez **loopMIDI** une fois (gratuit pour un usage personnel : [tobias-erichsen.de/software/loopmidi.html](https://www.tobias-erichsen.de/software/loopmidi.html)), puis relancez Joué Revival. Le programme crée son port avec le pilote qu'installe loopMIDI : ne créez aucun port dans loopMIDI. Le pilote n'est pas fourni ; s'il manque, la fenêtre le dit.
+- **macOS, Linux :** rien à installer (les ports virtuels du système ; non essayés).
+- Pour utiliser des ports qui existent déjà (loopMIDI, IAC), choisissez **Utiliser des ports qui existent déjà (loopMIDI, IAC...)** et indiquez **Envoyer vers** et **Écouter**.
 
-Quelques détails. Le contrôle Y des touches a 128 pas (le module n'en stocke pas un sur 14 bits), répartis sur les 16384 d'un fader Mackie ; le DAW applique sa propre courbe pour transformer une position de fader en dB. Une touche est touchée de sa note on à sa note off. La bulle est lâchée quand sa pression tombe à 0, ou après 0,7 seconde sans message. La bande repart de là où le doigt se pose après 0,3 seconde sans message. Tout autre message des touches est ignoré tant que Mackie Control traduit.
+## Les préréglages
 
-## Activation toute seule
+| Préréglage | Commandes |
+|---|---|
+| Scaler, Play Keys | une surface de mixage : master et 8 faders, solo, mute, armement, transport, panoramique, banques (voir plus bas) |
+| Matrix | les deux rangées de pads les plus proches de vous : mute 1 à 8 ; les deux rangées plus loin : solo 1 à 8 |
+| Strips, Rounds | faders 1 à 4 et 5 à 8 (pitch bend, canaux 1 à 8) |
+| Bubbles | quatre boutons : lecture, stop, enregistrement, cycle |
+| Grand Clavier, Play Piano | touches : armement, solo et mute de 8 pistes ; curseur : molette de jog ; deux boutons : banque à gauche et à droite. Armement 1, armement 5 et la dernière touche (sélection 1) sont désactivés : ils n'envoient rien tant que Mackie Control tourne |
+| Synth | touches à partir de la note 89 : transport et navigation ; quatre boutons : lecture, stop, enregistrement, cycle |
+| Play Drum | pads 1 à 6 : mute 1 à 6 ; pads 7 à 12 : solo 1 à 6 ; boutons : lecture et enregistrement |
+| Play Audio | lecture, enregistrement, les trois boutons de préréglage comme sélection 1 à 3, effet comme cycle |
 
-Le programme reconnaît un Scaler qui porte le préréglage de mixage, parce que ses notes et ses numéros de contrôleur sont ceux du préréglage et qu'aucun autre Scaler ne les a. Dès qu'un tel module est sur l'instrument, **Traduire** est activé et la fenêtre Mackie Control s'ouvre ; quand le module est retiré, la traduction est désactivée de nouveau, et tout ce qu'elle tient est relâché. Deux options de la fenêtre le désactivent : **S'activer tout seul quand un module de mixage est posé sur l'instrument** et **et ouvrir cette fenêtre**. Un Scaler avec sa propre disposition est laissé tranquille.
+Il n'y a pas de préréglage pour les Fretboards et la Guitare (les cordes n'envoient que des notes) ni pour la Pro Area. Un module Play ne peut être écrit que par une carte Pro.
 
-## La fenêtre Mackie Control
+Un module qui en utilise un porte une étiquette rouge **Préréglage Mackie Control** à côté de **Modifier**. **Pour revenir en arrière, envoyez de nouveau le préréglage d'origine du module** (*Pro Scaler*, *Pro Matrix*...). Faites de même avant de poser un autre préréglage Mackie dessus : écrire un préréglage Mackie par-dessus un autre ne donne pas le même module que par-dessus l'original.
 
-**Affichage > Mackie Control...** l'ouvre. **Traduire** active la traduction ; il faut que **Affichage > Écouter le port Play (contacts)** soit activé. La fenêtre dessine le master à gauche puis autant de faders que le DAW a de pistes (le DAW les nomme : huit au plus, puisqu'une surface Mackie a huit tranches), avec leurs contacts et leurs touches de sélection, la bulle, la bande, la lecture et l'enregistrement, et un journal de ce qui arrive du Scaler et de ce qui irait au DAW. Quand un DAW répond (plus tard), elle montre aussi les noms des pistes, la position des faders telle que le DAW l'a (un trait orange), les vumètres, les voyants d'armement, de solo et de mute (R, S, M), la piste sélectionnée, et le texte que le DAW écrit sous chaque fader, qui est en général sa valeur en dB.
+## Le Scaler comme table de mixage
 
-**Les boutons - et + du Scaler lui-même** (les deux de gauche) sont ses boutons d'octave : ils décalent de 12 les notes des touches et on ne peut pas leur faire envoyer quoi que ce soit. Le programme reconnaît le décalage à la position de la touche touchée et continue de marcher, mais il vaut mieux ne pas les presser.
+| Commande | Fait |
+|---|---|
+| Touche 1 (la plus à gauche) | fader master |
+| Touches 2 à 9 | faders 1 à 8 : la position du doigt le long de la touche est le fader |
+| Touche 10, **FINE** | maintenue, un fader bouge quatre fois moins |
+| Touche 11, **SHIFT** | maintenue, les touches 12 à 17 donnent leur seconde fonction |
+| Touches 12 à 17 | stop, retour rapide, avance rapide, solo, mute, armement de la piste sélectionnée. Avec maj : boucle, punch, annuler, rétablir, mode des faders, clic |
+| Boutons 1 et 2 (à droite) | lecture et enregistrement |
+| Bulle | gauche et droite : panoramique de la piste sélectionnée ; haut et bas : banque de pistes précédente et suivante |
+| Bande | molette de jog |
 
-**Modes des faders.** Les faders du Scaler sont des touches, et une touche n'a pas de moteur, donc un fader qu'a déplacé le DAW (un changement de banque, une automation) peut être ailleurs que le doigt. *Absolu* envoie la position du doigt : le fader saute. *Relatif* part à chaque contact de la valeur du DAW et suit le mouvement du doigt à partir de là. *Hybride* attend que le doigt atteigne la valeur du DAW, puis la suit. Le mode se choisit dans la fenêtre ou avec maj et la touche de mode (elle fait le tour). Relatif et hybride demandent que le DAW signale la position de ses faders, ce que fait un DAW Mackie pour ses pistes ; tant qu'il ne l'a pas fait, la position est utilisée telle quelle. Tenir la touche fin pendant un contact fait bouger lentement n'importe quel mode, et la relâcher ne fait pas sauter le fader.
+La **piste sélectionnée** est le dernier fader touché, sinon la piste que le DAW a sélectionnée. Une touche n'a pas de moteur : un fader déplacé par le DAW peut être ailleurs que le doigt ; le **mode des faders** (**Mode des faders :** dans la fenêtre, ou maj et touche 16) dit quoi faire : *absolu* va là où est le doigt, *relatif* part de la valeur du DAW et suit le mouvement, *hybride* attend que le doigt atteigne la valeur du DAW. Les directions de la bulle, la distance à pousser et la vitesse de répétition se règlent dans la fenêtre. Les boutons **-** et **+** du Scaler décalent les touches d'une octave : le programme s'en accommode, mais mieux vaut ne pas les presser.
 
-**La piste sélectionnée.** Solo, mute, armement et panoramique agissent sur le dernier fader touché ; si aucun n'a été touché, sur la piste que le DAW a sélectionnée ; déplacer les faders le long des pistes oublie le contact. La fenêtre la montre.
+## Les autres modules
 
-**La bulle** n'agit que tant qu'elle est pressée (sa pression est au-dessus de 0), et dans une seule direction à la fois : une poussée est gardée jusqu'à ce que le doigt revienne au centre, donc un doigt qui repose près d'un bord ne peut pas sauter entre deux directions. Elle répète une fois après 0,7 seconde puis toutes les demi-secondes tant qu'elle est poussée ; **la distance à pousser la bulle** et la vitesse de répétition se règlent dans la fenêtre, et la bulle peut être réglée sur rien. Quand le doigt part, la bulle ramène ses valeurs à 0 en glissant ; c'est ignoré. Cela a été fait à partir d'un enregistrement d'une vraie bulle.
+Pour eux, la fenêtre dessine **le module lui-même** : chaque commande montre ce qu'elle fait (MUTE 3, SOLO 5, JOG...), s'allume quand on la presse, et les voyants et les faders du DAW sont montrés. Le programme transmet les messages du module sans les changer (**Transmettre les messages du module sans les changer**, activé tout seul) et répond à la poignée de main du DAW.
 
-**Banques.** Une surface Mackie a huit tranches. Quand le DAW a plus de pistes, les deux touches de droite (et la bulle) poussent les huit faders le long des pistes, d'une piste à la fois par défaut, et le DAW envoie alors les noms et les positions des pistes qui sont entrées. Avec moins de huit pistes il n'y a rien à déplacer, et le DAW ignore les commandes de banque. **Gauche et droite** de la bulle sélectionnent la piste précédente ou suivante par défaut ; la fenêtre peut à la place les faire avancer d'une piste ou d'une banque. **Essayer une commande sur le DAW** envoie chaque commande Mackie à la main (banque, canal, curseur, sélection, lecture, arrêt, enregistrement), ce qui montre à quoi répond votre DAW sans toucher au Scaler. **Première piste** envoie assez de déplacements de banque et de canal vers la gauche pour ramener les faders sur la première piste, ce qui sert après avoir essayé des commandes à la main. **Copier le journal** met le journal dans le presse-papiers, pour le coller dans un message quand quelque chose ne marche pas.
+## Modules faits dans le concepteur
 
-## Seize faders
+**Générer > Mackie Control...** dans le [concepteur de modules](module-designer.fr.md) fait des pads avec les notes Mackie : armement, solo, mute et sélection de 8 pistes, transport, banques, curseurs. Un module dont tous les pads envoient des notes Mackie est reconnu comme un préréglage : Mackie Control s'active et la fenêtre le dessine. Il n'y a pas d'étiquette rouge, puisqu'il n'y a pas de préréglage d'origine auquel revenir. Les faders ne s'y font pas (une bande du concepteur envoie un contrôleur, un fader Mackie est du pitch bend) : utilisez le préréglage Strips ou Rounds.
 
-Une unité Mackie a huit tranches, donc une unité donne huit faders. Pour seize, le DAW a besoin d'une deuxième unité Mackie (une extension), chaque unité ayant sa propre paire de ports MIDI. La fenêtre a alors **Faders : 16 faders (deux unités Mackie)**.
+## Options
 
-- **Les touches.** La touche 1 est toujours le master. Les touches 2 à 9 sont les faders 1 à 8, sur la première unité, et les touches 10 à 17 sont les faders 9 à 16, sur la deuxième unité. Il ne reste aucune touche pour sélectionner les pistes ni pour les déplacer, donc la bulle, à gauche et à droite, déplace les faders le long des pistes (d'une piste à la fois, ou d'une banque), et les boutons sont toujours lecture et enregistrement.
-- **La fenêtre** montre le master à gauche puis autant de tranches que le DAW en nomme sur les deux unités ensemble.
-- **Quelle moitié est la première.** Laquelle des deux unités tient les huit premières pistes dépend de la façon dont le DAW les place : si la moitié gauche du Scaler montre les pistes 9 à 16, cochez **La deuxième unité tient les huit premières pistes**.
-- **Dans Bitwig**, ajoutez **Mackie > Mackie Control + 1 Extender** : il lui faut deux paires de ports MIDI, une pour chaque unité. Faites quatre ports loopMIDI, par exemple `Joue to DAW 1`, `DAW 1 to Joue`, `Joue to DAW 2`, `DAW 2 to Joue`, donnez la première paire à la première unité et la deuxième paire à l'extension, et dans la fenêtre choisissez les quatre mêmes ports (**Envoyer vers** et **Écouter**, puis les deux mêmes pour la deuxième unité). Non essayé avec un vrai Bitwig : les noms des choix dans Bitwig peuvent différer.
+**Faders :** 8 (une unité Mackie, par défaut) ou 16 (deux unités : le DAW demande une seconde unité, dans Bitwig *Mackie Control + 1 Extender*, et le programme crée un second port, **Joue Mackie 2**).
 
-**Ports croisés.** Si les deux unités du DAW sont sur les paires de ports opposées à celles que vous avez choisies, les pistes de la première unité sont signalées par la deuxième paire et les faders agissent sur le mauvais bloc. Quand le DAW dit quelle unité est laquelle (appareil 0x14 pour l'unité principale, 0x15 pour l'extension) le programme échange tout seul les deux paires et le dit dans le journal ; sinon cochez **L'unité principale du DAW est sur la deuxième paire de ports**. La fenêtre montre quelle unité le DAW dit être sur chaque paire.
+## Si ça ne marche pas
 
-**Passage direct.** **Laisser passer les messages du module sans changement** fait transmettre par Mackie Control ce que le module envoie, pour les préréglages Mackie directs des autres modules (voir mackie-presets.fr.md) ; il répond toujours à la poignée de main et montre les pistes du DAW.
+| Symptôme | À essayer |
+|---|---|
+| Rien du DAW dans le journal | connectez d'abord dans Joué Revival, puis ajoutez le contrôleur dans le DAW avec **Joue Mackie** en entrée et en sortie |
+| La fenêtre dit que le pilote manque (Windows) | installez loopMIDI ; la fenêtre a un bouton vers sa page de téléchargement |
+| Le module ne fait rien | **Affichage > Écouter le port Play (contacts)** doit être coché ; pour le Scaler, **Traduire** aussi |
+| Une touche d'un clavier ne fait rien | armement 1, armement 5 et sélection 1 sont désactivés |
+| L'armement ne fait rien dans le DAW | la piste ne peut pas être armée (un groupe, par exemple) |
 
-**Ce que la fenêtre vous dit.** Dans ce mode elle dit quand les deux ports de la deuxième unité ne sont pas choisis, quand rien n'est venu d'une unité quatre secondes après la connexion (le DAW n'utilise pas cette paire de ports), et quand les deux unités montrent les mêmes pistes (le DAW les reflète au lieu de suivre).
+Pour signaler un problème : **Copier le journal** dans la fenêtre, puis **Aide > Copier un rapport de bogue** et **Aide > Signaler un bogue...** (voir le README).
 
-**Si un fader agit sur deux banques.** Chaque touche va à une seule unité, et le journal dit laquelle : **vers le DAW** est la première unité, **vers la deuxième unité** la seconde. Si vous bougez une touche et que le DAW bouge des pistes dans les deux banques, les deux unités arrivent au même endroit dans le DAW. Le programme refuse de se connecter quand la deuxième unité reçoit les mêmes ports que la première, ou quand un port sert à la fois à envoyer et à écouter. Sinon regardez dans le DAW : son extension doit utiliser la deuxième paire de ports, pas la première, et être placée après l'unité principale (et ne pas la refléter). Pour le voir sans toucher au Scaler, appuyez sur **Sélection 1 (deuxième unité)** : le DAW devrait sélectionner sa neuvième piste, et **Select 1** sa première. Si les deux sélectionnent la première piste, le DAW lit les deux paires de ports comme la même unité.
-
-## Connexion à un DAW
-
-Par défaut le programme crée un port MIDI à lui, nommé `Joue Mackie` (et `Joue Mackie 2` pour une deuxième unité), que le DAW voit alors comme une entrée et une sortie. **Non essayé avec un vrai DAW** : ce qui suit est la configuration qui devrait marcher.
-
-- **Windows.** Le programme utilise le pilote qu'installe **loopMIDI** (le pilote MIDI virtuel gratuit de Tobias Erichsen) : installez loopMIDI une fois, et n'y créez aucun port. Le programme charge ce pilote quand il en a besoin et ne l'inclut pas ; vérifiez la licence de loopMIDI pour votre usage. Si le pilote manque, la fenêtre le dit et propose un bouton vers sa page de téléchargement.
-- **macOS** utilise des points de terminaison virtuels CoreMIDI, et **Linux** un port du séquenceur ALSA (reliez-le avec `aconnect` ou dans la liste de ports du DAW). Ni l'un ni l'autre n'a été essayé.
-- **Ports existants.** **Utiliser des ports qui existent déjà** garde l'ancienne façon : deux ports de bouclage (loopMIDI sous Windows, le pilote IAC sous macOS), un pour chaque sens, choisis comme **Envoyer vers** et **Écouter**.
-
-**Avec Bitwig**
-
-1. Dans Joué Revival : **Affichage > Mackie Control...**, appuyez sur **Connecter** (le programme se connecte ensuite tout seul quand un module de mixage est posé sur l'instrument). Le port `Joue Mackie` existe maintenant.
-2. Dans Bitwig : **Settings > Controllers > Add controller > Mackie > Mackie Control**. Mettez son entrée MIDI et sa sortie MIDI sur `Joue Mackie`. Faites-le après l'étape 1 : Bitwig ne liste le port que lorsqu'il existe.
-3. Posez le Scaler avec le préréglage de mixage sur l'instrument, ou cochez **Traduire** à la main.
-4. Regardez le journal : les lignes en ambre viennent **du DAW**. Un DAW qui demande « device query » puis envoie les noms de ses pistes nous parle.
-
-Si quelque chose ne marche pas, le journal est ce qu'il me faut : les premières lignes après avoir appuyé sur Connecter, et ce que le DAW envoie (**Copier le journal**).
-
-## Modules faits dans le concepteur de modules
-
-Un module fait dans le concepteur de modules dont tous les pads envoient des notes Mackie Control (utilisez **Générer > Mackie Control...**) est aussi un module Mackie Control : quand il est sur l'instrument, Mackie Control s'active, ouvre sa fenêtre, qui dessine le module avec ce que fait chaque pad, et ouvre le port. Il n'y a pas de préréglage d'origine auquel revenir, donc la marque rouge n'est pas montrée pour lui. Voir le [guide du concepteur de modules](module-designer.fr.md) et les [préréglages Mackie Control](mackie-presets.fr.md).
-
-## Signaler un problème
-
-Appuyez sur **Copier le journal** dans la fenêtre après avoir essayé, et utilisez **Aide > Copier un rapport de bogue** et **Aide > Signaler un bogue...** : le rapport contient la version, les informations sur l'appareil, les modules, le journal de détection et l'état de Mackie Control. Voir le README pour les étapes.
-
-## La suite
-
-1. La poignée de main Mackie et les réponses aux questions du DAW sont écrites (demande d'appareil, réponse de connexion, version) mais pas essayées ; les programmes diffèrent dans ce qu'ils exigent.
-2. Des essais avec le script Mackie Control de Bitwig et d'Ableton Live, et avec les ports que le programme crée lui-même sur chaque système.
-3. Une table pour changer ce que fait chaque touche, avec un bouton Apprendre.
+Pas encore fait : une table pour changer ce que fait chaque commande, et des essais avec d'autres DAW que Bitwig.

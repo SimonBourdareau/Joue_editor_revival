@@ -14,7 +14,7 @@ build=${2:?build directory}
 out=${3:?output directory}
 # the version of the project: the one on the project( line, not the minimum version of CMake
 version=$(sed -n 's/^project([^ ]* VERSION \([0-9.]*\).*/\1/p' cpp/CMakeLists.txt)
-documents="docs/user-guide.md docs/mixer-bridge.md docs/mixer-bridge.fr.md docs/mackie-presets.md docs/mackie-presets.fr.md docs/module-designer.md docs/user-guide.fr.md docs/module-designer.fr.md docs/editor-preview.png docs/designer-preview.png docs/editor-preview-fr.png docs/designer-preview-fr.png LICENSE"
+documents="docs/user-guide.md docs/mixer-bridge.md docs/mixer-bridge.fr.md docs/module-designer.md docs/user-guide.fr.md docs/module-designer.fr.md docs/editor-preview.png docs/designer-preview.png docs/editor-preview-fr.png docs/designer-preview-fr.png LICENSE"
 put_readmes() {
     sed "s/README-$platform.fr.md/README.fr.md/g" "docs/README-$platform.md" > "$1/README.md"
     sed "s/README-$platform.md/README.md/g" "docs/README-$platform.fr.md" > "$1/README.fr.md"
