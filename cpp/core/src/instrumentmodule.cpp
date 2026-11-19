@@ -1072,6 +1072,39 @@ Bytes presetToBlob(const ModuleBindings& bindings, const Bytes& base, const Node
     return encodeSettings(bindings, base, presetChanges(bindings, base, libraryModule));
 }
 
+bool presetHolds(const ModuleBindings& bindings, const Bytes& blob, const Node& preset, const Node& reference, int* agree, int* disagree) {
+    if (!presetMismatch(preset, blob).empty()) return false;
+    SettingValues wanted = collectValues(preset);
+    SettingValues factory = collectValues(reference);
+    SettingValues current = decodeSettings(bindings, blob);
+    std::set<std::pair<std::string, std::string>> bound = boundSettings(bindings);
+    int equal = 0, different = 0;
+    for (const auto& kv : wanted) {
+        if (!bound.count(kv.first)) continue;
+        auto shared = factory.find(kv.first);
+        if (shared != factory.end() && shared->second == kv.second) continue;
+        const std::string& value = kv.second;
+        std::size_t semicolon = value.find(';');
+        if (semicolon != std::string::npos) {
+            auto lo = current.find({kv.first.first, kv.first.second + "#lo"});
+            auto hi = current.find({kv.first.first, kv.first.second + "#hi"});
+            if (lo == current.end() || hi == current.end()) continue;
+            int a = roundInt(std::atof(value.substr(0, semicolon).c_str())), b = roundInt(std::atof(value.substr(semicolon + 1).c_str()));
+            if (std::atoi(lo->second.c_str()) == a && std::atoi(hi->second.c_str()) == b) ++equal;
+            else ++different;
+        } else {
+            auto it = current.find(kv.first);
+            if (it == current.end()) continue;
+            if (it->second == value) ++equal;
+            else ++different;
+        }
+    }
+    // a setting or two may not read back the way it was written, so the module holds the preset when clearly more settings agree than do not
+    if (agree) *agree = equal;
+    if (disagree) *disagree = different;
+    return equal > 0 && different * 10 <= equal;
+}
+
 std::vector<std::string> describeChanges(const ModuleBindings& bindings, const Bytes& base, const SettingValues& changes) {
     SettingValues current = decodeSettings(bindings, base);
     std::vector<std::string> lines;

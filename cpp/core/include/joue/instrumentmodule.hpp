@@ -133,6 +133,14 @@ std::string presetMismatch(const Node& libraryModule, const Bytes& blob);
 SettingValues presetChanges(const ModuleBindings& bindings, const Bytes& base, const Node& libraryModule);
 std::vector<std::string> describeChanges(const ModuleBindings& bindings, const Bytes& base, const SettingValues& changes);
 
+// Whether a module's bytes hold a preset: every setting in which the preset differs from the reference (the factory preset of the same type)
+// that the module stores in its present state has the preset's value (all but a tenth of them at most), and there is at least one. What the preset shares with the reference
+// says nothing about it, and what is not stored in the module's present state is not looked at. Writing a preset again over a module that
+// has it would not give the same module, so this is how a module is told to run a preset.
+// agree and disagree, when given, receive how many of those settings are the preset's and how many are not, to choose the closest of several
+// presets that hold.
+bool presetHolds(const ModuleBindings& bindings, const Bytes& blob, const Node& preset, const Node& reference, int* agree = nullptr, int* disagree = nullptr);
+
 // Library module nodes for a module of the instrument. The template is a library module of the same type (a factory preset):
 // it supplies every setting the table does not cover, the values read from the blob replace the others.
 std::unique_ptr<Node> moduleFromBlob(const Node& libraryModule, const ModuleBindings& bindings, const Bytes& blob);

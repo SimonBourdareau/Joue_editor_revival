@@ -3,6 +3,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include "liveview.hpp"
+#include "joue/instrumentmodule.hpp"
 #include "fonts.hpp"
 
 #include <algorithm>
@@ -18,6 +19,7 @@
 #include "joue/deviceinfo.hpp"
 #include "joue/endpoints.hpp"
 #include "joue/i18n.hpp"
+#include "joue/mixer.hpp"
 #include "joue/moduleart.hpp"
 
 using joue::i18n::tr;
@@ -135,6 +137,11 @@ bool LiveView::canLoadTemporarily() {
     return connected_ && !pushing_ && !pushJob_ && !temporaryJob_ && !tagJob_;
 }
 
+void LiveView::setPlayHook(std::function<void(const joue::Bytes&)> hook) {
+    std::lock_guard<std::mutex> lock(hookMutex_);
+    playHook_ = std::move(hook);
+}
+
 bool LiveView::newTagIn(int slot) {
     std::shared_ptr<const Shown> shown;
     {
@@ -142,6 +149,76 @@ bool LiveView::newTagIn(int slot) {
         shown = shown_;
     }
     return slot >= 1 && slot <= joue::SlotCount && shown && shown->newTags[static_cast<std::size_t>(slot - 1)];
+}
+
+bool LiveView::mixerModulePresent() {
+    std::shared_ptr<const Shown> shown;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        shown = shown_;
+    }
+    return shown && shown->mixer;
+}
+
+std::vector<std::string> LiveView::mackiePresetNames() {
+    std::shared_ptr<const Shown> shown;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        shown = shown_;
+    }
+    std::vector<std::string> names;
+    if (!shown) return names;
+    for (const auto& item : shown->mackie) {
+        if (!item.first.empty()) names.push_back(item.first);
+    }
+    return names;
+}
+
+bool LiveView::mackieModulePresent() {
+    std::shared_ptr<const Shown> shown;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        shown = shown_;
+    }
+    if (!shown) return false;
+    for (const auto& item : shown->mackie) {
+        if (!item.first.empty()) return true;
+    }
+    return false;
+}
+
+std::vector<LiveView::MackieSurface> LiveView::mackieSurfaces() {
+    std::shared_ptr<const Shown> shown;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        shown = shown_;
+    }
+    std::vector<MackieSurface> found;
+    if (!shown) return found;
+    for (std::size_t i = 0; i < shown->placed.size() && i < shown->mackie.size() && i < shown->designs.size(); ++i) {
+        if (shown->mackie[i].first.empty() || joue::mixer::isMixerLayout(shown->placed[i].blob.toBytes())) continue;
+        MackieSurface surface{shown->placed[i], shown->designs[i], shown->mackie[i].first, shown->mackie[i].second, {}, {}, 0, {}};
+        int type = shown->placed[i].blob.header.type;
+        if (const joue::ModuleBindings* bindings = joue::moduleBindings(type)) surface.settings = joue::decodeSettings(*bindings, shown->placed[i].blob.toBytes());
+        for (std::size_t k = 0; k < shown->designs[i].count(); ++k) surface.names.push_back(joue::elementNameOfRecord(type, k));
+        for (const joue::Shape& shape : joue::moduleArt(type).shapes) {
+            if (shape.element.rfind("KEY", 0) == 0) ++surface.keys;
+        }
+        for (std::size_t k = 0; k < shown->designs[i].count(); ++k) {
+            int note = -1;
+            if (shown->designs[i].hasBox(k)) {
+                joue::ElementHeader h = shown->designs[i].header(k);
+                if (h.type == joue::element::Pad || h.type == joue::element::Key) {
+                    for (const joue::FieldSpec& f : joue::bodyFields(h.type, h.version)) {
+                        if (std::string(f.name) == "Note") note = shown->designs[i].field(k, f);
+                    }
+                }
+            }
+            surface.notes.push_back(note);
+        }
+        found.push_back(std::move(surface));
+    }
+    return found;
 }
 
 bool LiveView::playBoard() {
@@ -337,12 +414,20 @@ bool LiveView::openPlay() {
         playSource_ = playPair_.source.name;
         playPort_ = joue::openPort(playPair_, true);
         playPort_->setMessageHandler([this](const joue::Bytes& m) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            ++messages_;
-            lastMessage_ = m;
-            if ((m[0] & 0xF0) >= 0x80 && (m[0] & 0xF0) <= 0xE0) ++kindCounts_[((m[0] & 0xF0) >> 4) - 8];
-            if ((m[0] & 0xF0) == 0xB0 && m.size() > 1) ++controllerCounts_[m[1] & 0x7F];
-            tracker_.feed(m, nowMs());
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                ++messages_;
+                lastMessage_ = m;
+                if ((m[0] & 0xF0) >= 0x80 && (m[0] & 0xF0) <= 0xE0) ++kindCounts_[((m[0] & 0xF0) >> 4) - 8];
+                if ((m[0] & 0xF0) == 0xB0 && m.size() > 1) ++controllerCounts_[m[1] & 0x7F];
+                tracker_.feed(m, nowMs());
+            }
+            std::function<void(const joue::Bytes&)> hook;
+            {
+                std::lock_guard<std::mutex> lock(hookMutex_);
+                hook = playHook_;
+            }
+            if (hook) hook(m);
         });
         return true;
     } catch (const std::exception&) {
@@ -449,7 +534,11 @@ bool LiveView::connect(std::string& error) {
 void LiveView::apply(const std::array<joue::SlotInfo, joue::SlotCount>& slots) {
     auto shown = std::make_shared<Shown>();
     shown->placed = joue::placeModules(slots);
-    for (const joue::PlacedModule& m : shown->placed) shown->designs.push_back(joue::Design::fromBytes(m.blob.toBytes()));
+    for (const joue::PlacedModule& m : shown->placed) {
+        shown->designs.push_back(joue::Design::fromBytes(m.blob.toBytes()));
+        if (joue::mixer::isMixerLayout(m.blob.toBytes())) shown->mixer = true;
+        shown->mackie.push_back(mackieName ? mackieName(m.blob.toBytes()) : std::pair<std::string, std::string>());
+    }
     for (std::size_t i = 0; i < unreadable_.size(); ++i) {
         if (!unreadable_[i].empty()) shown->unreadable.push_back({static_cast<int>(i) + 1, unreadable_[i]});
     }
@@ -988,6 +1077,53 @@ void LiveView::drawPanel(float height) {
             if (!isVirtual && ImGui::SmallButton(tr("Edit")) && onEdit) onEdit(m.slot, m.raw);
             ImGui::PopID();
         }
+        if (!isVirtual && i < shown->mackie.size() && !shown->mackie[i].first.empty() && !shown->mackie[i].second.empty()) {
+            // a module that runs a Mackie Control preset says so in red, next to Edit, with what to do to get the original back
+            const std::string label = tr("Mackie Control preset");
+            ImVec2 size = ImGui::CalcTextSize(label.c_str());
+            const float padX = 6.0f * scale, padY = 2.0f * scale;
+            float editLeft = end.x - ImGui::CalcTextSize(tr("Edit")).x - 22.0f * scale;
+            ImVec2 a(editLeft - size.x - 2.0f * padX - 8.0f * scale, corner.y + 4.0f * scale);
+            if (a.x < corner.x + 12.0f + text.x) a = ImVec2(corner.x + 3.0f, corner.y + 9.0f + text.y + 4.0f * scale);
+            ImVec2 b = a + ImVec2(size.x + 2.0f * padX, size.y + 2.0f * padY);
+            char message[640];
+            std::snprintf(message, sizeof message, tr("This module is running the Mackie Control preset \"%s\". To go back to the original %s preset, that preset has to be loaded again: select it in the library and upload it to the module."), shown->mackie[i].first.c_str(), shown->mackie[i].second.c_str());
+            ImGui::SetCursorScreenPos(a);
+            ImGui::PushID(3000 + static_cast<int>(i));
+            ImGui::InvisibleButton("##mackie", b - a);
+            bool hovered = ImGui::IsItemHovered();
+            list->AddRectFilled(a, b, hovered ? IM_COL32(235, 55, 55, 255) : IM_COL32(200, 35, 35, 240), 4.0f);
+            list->AddText(a + ImVec2(padX, padY), IM_COL32(255, 255, 255, 255), label.c_str());
+            std::string key = std::to_string(m.slot) + ":" + shown->mackie[i].first;
+            if (ImGui::IsItemClicked() || mackieAnnounced_.insert(key).second) ImGui::OpenPopup("mackienotice");
+            if (hovered) {
+                ImGui::BeginTooltip();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+                ImGui::PushTextWrapPos(380.0f * scale);
+                ImGui::TextUnformatted(message);
+                ImGui::PopTextWrapPos();
+                ImGui::PopStyleColor();
+                ImGui::EndTooltip();
+            }
+            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.85f, 0.15f, 0.15f, 1.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 2.0f);
+            ImGui::SetNextWindowPos(ImVec2(std::min(a.x, ImGui::GetIO().DisplaySize.x - 400.0f * scale), b.y + 6.0f * scale), ImGuiCond_Appearing);
+            if (ImGui::BeginPopup("mackienotice")) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+                ImGui::TextUnformatted(tr("Mackie Control preset"));
+                ImGui::Separator();
+                ImGui::PushTextWrapPos(380.0f * scale);
+                ImGui::TextUnformatted(message);
+                ImGui::PopTextWrapPos();
+                ImGui::PopStyleColor();
+                ImGui::Spacing();
+                if (ImGui::Button(tr("OK"))) ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
+            }
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor();
+            ImGui::PopID();
+        }
         bool playsNotes = joue::hasOctaveButtons(m.blob);
         if (playsNotes) {
             // the board does not say when an octave button is pressed, so the shift is inferred; these correct it
@@ -1086,6 +1222,11 @@ void LiveView::drawPanel(float height) {
         }
         std::vector<std::string> lines = logLines();
         if (!lines.empty() && ImGui::TreeNode(tr("Detection log"))) {
+            if (ImGui::SmallButton(tr("Copy the detection log"))) {
+                std::string text;
+                for (const std::string& line : lines) text += line + "\n";
+                ImGui::SetClipboardText(text.c_str());
+            }
             for (std::size_t k = lines.size(); k-- > 0;) ImGui::TextDisabled("%s", joue::i18n::message(lines[k]).c_str());
             ImGui::TreePop();
         }

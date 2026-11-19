@@ -1000,6 +1000,33 @@ std::size_t Design::addPadGrid(Box area, int rows, int columns, int gap, int fir
     return last;
 }
 
+const std::vector<MackieLayout>& mackieLayouts() {
+    static const std::vector<MackieLayout> layouts = {
+        {"Arm, solo, mute and select of 8 tracks", 4, 8, 0, 8},
+        {"Mute and solo of 8 tracks", 2, 8, 8, 8},
+        {"Mute and solo of 8 tracks, in four rows of four", 4, 4, 8, 4},
+        {"Transport: rewind, fast forward, stop, play, record", 1, 5, 91, 5},
+        {"Banks and channels: bank left and right, channel left and right", 1, 4, 46, 4},
+        {"Cursors: up, down, left, right", 1, 4, 96, 4},
+    };
+    return layouts;
+}
+
+std::size_t Design::addMackieLayout(Box area, int layout) {
+    const std::vector<MackieLayout>& layouts = mackieLayouts();
+    if (layout < 0 || layout >= static_cast<int>(layouts.size())) return count();
+    const MackieLayout& chosen = layouts[static_cast<std::size_t>(layout)];
+    std::size_t before = count();
+    std::size_t last = addPadGrid(area, chosen.rows, chosen.columns, 2, chosen.firstNote, chosen.rowStep, 1);
+    for (std::size_t i = before; i < count(); ++i) {
+        if (blob_.elements[i].type() != element::Pad) continue;
+        for (const FieldSpec& f : PadFields) {
+            if (std::string(f.name) == "Velocity min" || std::string(f.name) == "Velocity max") setField(i, f, 127);
+        }
+    }
+    return last;
+}
+
 std::size_t Design::addKeyboard(Box area, int firstNote, int whiteKeys, int channel) {
     whiteKeys = std::max(1, whiteKeys);
     static const int steps[7] = {2, 2, 1, 2, 2, 2, 1};  // semitones from a white key to the next, starting on C
@@ -1091,7 +1118,9 @@ std::vector<std::string> Design::problems() const {
         std::string label = i18n::text(elementName(h.type)) + " " + std::to_string(h.id);
         if (std::find(ids.begin(), ids.end(), h.id) != ids.end()) out.push_back("Error: " + label + " repeats an element number.");
         ids.push_back(h.id);
-        if (h.x + h.width > widthMm() || h.y + h.height > HeightMm) out.push_back("Error: " + label + " reaches beyond the surface.");
+        if (h.x + h.width > widthMm() || h.y + h.height > HeightMm) {
+            out.push_back("Error: " + label + " reaches beyond the surface (x " + std::to_string(h.x) + " to " + std::to_string(h.x + h.width) + ", y " + std::to_string(h.y) + " to " + std::to_string(h.y + h.height) + "; the surface is " + std::to_string(widthMm()) + " by " + std::to_string(HeightMm) + " mm).");
+        }
         if (h.width < 2 || h.height < 2) out.push_back("Error: " + label + " is smaller than 2 mm.");
         for (std::size_t j = i + 1; j < count(); ++j) {
             if (!hasBox(j)) continue;

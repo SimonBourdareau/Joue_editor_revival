@@ -11,7 +11,7 @@ This guide covers the main window. For drawing layouts, printing them and writin
 - **Centre: the module.** Its picture (click an element to edit it) and, for a preset that fits a module in the instrument, the upload panel.
 - **Right: Settings and MIDI mapping.** The settings of the module, and those of the element you clicked.
 
-Menus: **File** (New library, Open..., Open from path..., Open the factory presets, Module designer..., Save, Export a copy..., Import presets..., Export my presets..., Quit), **Edit** (Undo, Redo), **View** (Device information, Module designer, Live instrument, Language / Langue, Touch to select, Listen to the Play port), **Help** (Quick start, User guide, Module designer guide, updates).
+Menus: **File** (New library, Open..., Open from path..., Open the factory presets, Module designer..., Save, Export a copy..., Import presets..., Export my presets..., Quit), **Edit** (Undo, Redo), **View** (Device information, Mackie Control, Module designer, Live instrument, Language / Langue, Touch to select, Listen to the Play port), **Help** (Quick start, User guide, Module designer guide, Mackie Control guide, updates, Copy a bug report, Report a bug...).
 
 ## The library
 
@@ -104,6 +104,7 @@ The data folder is `%APPDATA%\JoueEditorNG` on Windows, `~/Library/Application S
 | No *Connected* | Quit the original editor; unplug and plug the USB cable; look at the ports line under **Details**. If it says the Joué is in firmware update mode, update it with the Joué firmware updater first. |
 | A module is missing or in the wrong slot | **Rescan modules**; read the **Detection log**. |
 | The upload and tag buttons are greyed, with a message about a Joué Play | The board is a Play board: it cannot change modules, a Joué Pro is needed. |
+| Not written: the layout has an error, for example "Zone 31 reaches beyond the surface" | The program checks the layout before writing. Since version 0.47.2 it refuses only the errors that the change brings, not those that the module on the instrument already has, and the message says which is which and gives the measures (x, y, size of the surface). If the change made the error, fix it in the Check section of the designer. For a bug report, send **View > Device information... > Copy** and the text of the error. |
 | A module is listed in orange: *detected, but its layout could not be read* | Open **Details**, **Detection log**, and send the lines for that slot when you report it. |
 | The panel is slow to show a change, or stays in its previous state for some seconds | A module that the board announces but whose layout cannot be read is tried three times, then again every few seconds, so that it does not hold up the other slots. Take it off and put it back flat: the board announces it again and it is read at once. A module that is not seated flat can lose its tag: **View > Device information...**, **Read again**, and look at *Tag in slot N*. |
 | Another program gets no notes | Switch off **View > Listen to the Play port**. |

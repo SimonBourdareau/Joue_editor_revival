@@ -91,6 +91,7 @@ private:
     joue::Box dragBox_;
     float dragStartX_ = 0, dragStartY_ = 0;
     bool created_ = false;
+    int mackieLayout_ = 0;
     int gridRows_ = 4, gridColumns_ = 4, gridGap_ = 2, gridFirstNote_ = 36, gridRowStep_ = 4, gridChannel_ = 1;
     int keyboardWhite_ = 8, keyboardFirst_ = 48, keyboardChannel_ = 1;
     bool printLetter_ = false, printLabels_ = true, printGrid_ = false, printMarks_ = true;  // the choices of the print window

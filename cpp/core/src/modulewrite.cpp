@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <optional>
+#include <set>
 
 #include "joue/designer.hpp"
 #include "joue/instrumentmodule.hpp"
@@ -23,9 +24,15 @@ PushReport pushLayout(Device& device, TransferClient& client, int slot, const By
     if (original.size() < InstrumentHeader::Length || edited.size() < InstrumentHeader::Length) return failure("There is no layout to write.");
     try {
         Design design = Design::fromBytes(edited);
-        design.setSlots(Design::fromBytes(original).slots());  // the layout has to fit the module that is there, not grow it
+        Design before = Design::fromBytes(original);
+        design.setSlots(before.slots());  // the layout has to fit the module that is there, not grow it
+        // only an error that the edit brings is a reason not to write: one that the module on the instrument already has stays as it is
+        std::set<std::string> already;
+        for (const std::string& line : before.problems()) {
+            if (line.rfind("Error", 0) == 0) already.insert(line);
+        }
         for (const std::string& line : design.problems()) {
-            if (line.rfind("Error", 0) == 0) return failure("Not written: the layout has an error.\nWhy: " + line.substr(7) + "\nWhat to do: fix it in the Check section of the designer, then try again.");
+            if (line.rfind("Error", 0) == 0 && !already.count(line)) return failure("Not written: the layout has an error.\nWhy: " + line.substr(7) + "\nThe module on the instrument does not have this problem: the change made it.\nWhat to do: fix it in the Check section of the designer, then try again.");
         }
     } catch (const std::exception&) {
         return failure("Not written: the edited layout is not a valid module blob.");

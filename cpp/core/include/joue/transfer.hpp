@@ -17,6 +17,7 @@ class MidiPort {
 public:
     virtual ~MidiPort() = default;
     virtual void send(const Bytes& sysex) = 0;
+    virtual void sendMessage(const Bytes& message) { send(message); }
     void setHandler(std::function<void(const Bytes&)> handler);
     // Channel messages (notes, pressure, controllers, pitch bend) of a port that is listened to.
     void setMessageHandler(std::function<void(const Bytes&)> handler);

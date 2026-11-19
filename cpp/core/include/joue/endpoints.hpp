@@ -44,5 +44,19 @@ int chooseEditorPair(const std::vector<PortPair>& pairs);
 std::vector<EndpointInfo> listEndpoints();
 // inputOnly: the output of the pair is not opened (the Play port is only listened to; holding its output could keep other programs from it).
 std::unique_ptr<MidiPort> openPort(const PortPair& pair, bool inputOnly = false);
+// One side of a port on its own: the destination that messages are sent to, or the source that is listened to. A loopback port (loopMIDI on
+// Windows, the IAC driver on macOS) is used like this to talk to a DAW.
+std::unique_ptr<MidiPort> openOutputPort(const EndpointInfo& destination);
+std::unique_ptr<MidiPort> openInputPort(const EndpointInfo& source);
+
+// A MIDI port that the program creates itself. Another program (a DAW) sees it as an input and an output with this name, so nothing like
+// loopMIDI has to be set up by hand. toDaw sends to the DAW; fromDaw delivers what the DAW sends. On Windows this uses the driver that
+// loopMIDI installs (loaded when needed, not included); on macOS CoreMIDI virtual endpoints; on Linux an ALSA sequencer port.
+struct VirtualPort {
+    std::unique_ptr<MidiPort> toDaw, fromDaw;
+};
+// False, with what is missing and how to get it, where a port cannot be created.
+bool virtualPortsAvailable(std::string& explanation);
+bool createVirtualPort(const std::string& name, VirtualPort& port, std::string& error);
 
 }  // namespace joue

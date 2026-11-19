@@ -1,0 +1,587 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Library>
+	<String name="Version" value="3" />
+	<Array name="ModuleList">
+		<Module name="Mackie Control: Scaler">
+			<String name="Type" value="14" />
+			<String name="Version" value="3" />
+			<String name="Revision" value="1" />
+			<String name="Color" value="4" />
+			<String name="Options" value="0" />
+			<String name="ReadOnly" value="0" />
+			<Array name="ElementList">
+				<Element name="KEY1">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="36" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="14" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY2">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="37" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="15" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY3">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="38" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="16" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY4">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="39" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="17" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY5">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="40" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="18" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY6">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="41" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="19" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY7">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="42" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="20" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY8">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="43" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="21" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY9">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="44" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="22" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY10">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="45" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="23" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY11">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="46" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="24" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY12">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="47" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="25" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY13">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="48" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="26" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY14">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="49" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="27" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY15">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="50" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="28" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY16">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="51" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="29" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="KEY17">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="52" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="30" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="ALL_KEYS">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Channel" value="1" />
+						<Setting name="Note" value="24" />
+						<Setting name="Scale" value="1" />
+						<Setting name="NoteVelocity" value="1;127" />
+						<Setting name="YControlEnable" value="1">
+							<Array name="Children">
+								<Setting name="YControl" value="74" />
+								<Setting name="YControlRange" value="0;127" />
+								<Setting name="YControlDirection" value="Natural" />
+								<Setting name="YControlMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="YControlOrigin" value="64" />
+									</Array>
+								</Setting>
+								<Setting name="YControlCC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="YControlFine" value="75" />
+									</Array>
+								</Setting>
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="GLISSANDO">
+					<String name="Revision" value="1" />
+					<Array name="SettingsList" />
+				</Element>
+				<Element name="BUTTON1">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Function" value="Note">
+							<Array name="Children">
+								<Setting name="NoteChannel" value="1" />
+								<Setting name="Note" value="94" />
+								<Setting name="CCChannel" value="10" />
+								<Setting name="CC" value="0" />
+								<Setting name="CCRange" value="0;127" />
+								<Setting name="CCDirection" value="Natural" />
+								<Setting name="PitchbendChannel" value="10" />
+								<Setting name="PitchbendRange" value="-10000;8192" />
+								<Setting name="PitchbendDirection" value="Up" />
+								<Setting name="PCChannel" value="10" />
+								<Setting name="PC" value="0" />
+								<Setting name="ScriptChannel" value="10" />
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="BUTTON2">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Function" value="Note">
+							<Array name="Children">
+								<Setting name="NoteChannel" value="1" />
+								<Setting name="Note" value="95" />
+								<Setting name="CCChannel" value="10" />
+								<Setting name="CC" value="1" />
+								<Setting name="CCRange" value="0;127" />
+								<Setting name="CCDirection" value="Natural" />
+								<Setting name="PitchbendChannel" value="10" />
+								<Setting name="PitchbendRange" value="-10000;8192" />
+								<Setting name="PitchbendDirection" value="Up" />
+								<Setting name="PCChannel" value="10" />
+								<Setting name="PC" value="1" />
+								<Setting name="ScriptChannel" value="11" />
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="BUBBLE">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="EnableX" value="1">
+							<Array name="Children">
+								<Setting name="ChannelX" value="1" />
+								<Setting name="ControlX" value="80" />
+								<Setting name="RangeX" value="0;127" />
+								<Setting name="DirectionX" value="Natural" />
+								<Setting name="StartValueX" value="0" />
+							</Array>
+						</Setting>
+						<Setting name="EnableY" value="1">
+							<Array name="Children">
+								<Setting name="ChannelY" value="1" />
+								<Setting name="ControlY" value="81" />
+								<Setting name="RangeY" value="0;127" />
+								<Setting name="DirectionY" value="Natural" />
+								<Setting name="StartValueY" value="0" />
+							</Array>
+						</Setting>
+						<Setting name="EnableZ" value="1">
+							<Array name="Children">
+								<Setting name="ChannelZ" value="1" />
+								<Setting name="ControlZ" value="82" />
+								<Setting name="RangeZ" value="0;127" />
+								<Setting name="DirectionZ" value="Natural" />
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+				<Element name="STRIP">
+					<String name="Revision" value="2" />
+					<Array name="SettingsList">
+						<Setting name="Function" value="Control Change">
+							<Array name="Children">
+								<Setting name="CCChannel" value="1" />
+								<Setting name="CC" value="83" />
+								<Setting name="CCRange" value="0;127" />
+								<Setting name="CCDirection" value="Natural" />
+								<Setting name="CCMode" value="Absolute">
+									<Array name="Children">
+										<Setting name="CCDemultiplier" value="2" />
+									</Array>
+								</Setting>
+								<Setting name="CC14Bits" value="0">
+									<Array name="Children">
+										<Setting name="CCFine" value="5" />
+									</Array>
+								</Setting>
+								<Setting name="PitchbendChannel" value="10" />
+								<Setting name="PitchbendRange" value="-10000;8192" />
+							</Array>
+						</Setting>
+					</Array>
+				</Element>
+			</Array>
+			<Array name="SettingsList">
+				<Setting name="Color" value="4" />
+				<Setting name="ReadOnly" value="0" />
+				<Setting name="Vibrato" value="0" />
+				<Setting name="Glissando" value="1" />
+				<Setting name="Aftertouch" value="1" />
+				<Setting name="MPE" value="1" />
+				<Setting name="Expert" value="1" />
+				<Setting name="Advanced" value="1">
+					<Array name="Children">
+						<Setting name="Dynamic" value="High" />
+						<Setting name="MpeChannels" value="1-16" />
+						<Setting name="VibratoValue" value="-10000;2" />
+						<Setting name="GlissandoRange" value="48" />
+						<Setting name="AftertouchType" value="Channel" />
+					</Array>
+				</Setting>
+			</Array>
+		</Module>
+	</Array>
+</Library>

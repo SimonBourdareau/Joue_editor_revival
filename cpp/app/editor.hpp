@@ -2,6 +2,7 @@
 #include <future>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
@@ -10,6 +11,7 @@
 #include "designer.hpp"
 #include "joue/instrumentmodule.hpp"
 #include "liveview.hpp"
+#include "mixerbridge.hpp"
 #include "texture.hpp"
 #include "updatecheck.hpp"
 #include "joue/endpoints.hpp"
@@ -52,7 +54,11 @@ public:
 
 private:
     // library state
-    void loadRoot(std::unique_ptr<joue::Node> root, const std::string& message);
+    void loadRoot(std::unique_ptr<joue::Node> root, const std::string& message, bool builtIns = true);
+    void addMackieFolder();
+    void drawMixerScaler(const MixerBridge::View& view, float scale);
+    void drawMackieSurfaces(const MixerBridge::View& view, const std::vector<LiveView::MackieSurface>& surfaces, float scale);
+    std::pair<std::string, std::string> mackiePresetFor(const joue::Bytes& blob);
     void openFromPath(const std::string& path);
     bool saveLibrary();
     void exportCopy(const std::string& path);
@@ -115,10 +121,25 @@ private:
     bool changedThisFrame_ = false;
 
     void drawDeviceInfoWindow();
+    void drawMixerWindow();
+    void refreshMixerPorts();
+    void applyMixerSpeed();
+    bool connectMixerPorts(std::string& problem);
     void drawComparePopup();
     void drawHelp();
     void pollUpdateCheck();
-    void openGuide(bool designer);
+    void openGuide(int which);  // 0 the user guide, 1 the module designer guide, 2 the Mackie Control guide
+    void copyBugReport();
+    std::string bugReportText();
+    bool mixerOpen_ = false, mixerAuto_ = true, mixerAutoOpen_ = true, mixerPresentSeen_ = false, mixerSwitchedOn_ = false;
+    std::vector<joue::EndpointInfo> mixerPorts_;
+    std::string mixerOutName_, mixerInName_, mixerOut2Name_, mixerIn2Name_, mixerPortsProblem_, mixerConnectProblem_;
+    bool mixerPortsRead_ = false;
+    joue::mixer::Options mixerOptions_;
+    int mixerSpeed_ = 1;
+    int mixerMode_ = 0;
+    bool mixerVirtual_ = true;
+    bool mixerSwapManual_ = false, mixerSwapValue_ = false;
     bool deviceInfoOpen_ = false, helpOpen_ = false, welcomeSeen_ = false, checkUpdates_ = true, comparePopup_ = false, compareReady_ = false, updateStarted_ = false, updateManual_ = false;
     std::vector<std::string> compareLines_;
     std::string compareTitle_;
@@ -152,6 +173,15 @@ private:
     bool scrollToSelected_ = false;
     std::string pendingElement_;
     Designer designer_;
+    MixerBridge mixer_;
+    struct MackiePreset {
+        int type = 0;
+        std::string name;
+        std::unique_ptr<joue::Node> node;
+        std::shared_ptr<joue::Node> reference;  // the factory preset of the same type
+    };
+    std::vector<MackiePreset> mackiePresets_;
+    std::mutex mackieMutex_;
     LiveView live_;
     float liveHeight_ = 0;  // height of the instrument panel above the columns; 0 until the first frame sets it
 

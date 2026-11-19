@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(joue_editor_ng VERSION 0.42.4 LANGUAGES CXX)
+project(joue_editor_ng VERSION 0.49.1 LANGUAGES CXX)
 # the version shown in the program and in the About window comes from here
 add_compile_definitions(JOUE_VERSION="${PROJECT_VERSION}")
 if(WIN32)
@@ -33,8 +33,8 @@ FetchContent_MakeAvailable(pugixml)
 
 add_library(joue_core STATIC
   core/src/bytes.cpp core/src/sysex.cpp core/src/transfer.cpp core/src/device.cpp
-  core/src/blob.cpp core/src/library.cpp core/src/endpoints.cpp core/src/coremidi.cpp core/src/winmidi.cpp core/src/alsamidi.cpp core/src/midi_stub.cpp
-  core/src/moduleart.cpp core/src/deviceinfo.cpp core/src/compare.cpp core/src/update.cpp core/src/settingsmeta.cpp core/src/designer.cpp core/src/midiparse.cpp core/src/live.cpp core/src/modulewrite.cpp core/src/i18n.cpp core/src/bindings.cpp core/src/instrumentmodule.cpp core/src/printout.cpp)
+  core/src/blob.cpp core/src/library.cpp core/src/endpoints.cpp core/src/virtualport.cpp core/src/coremidi.cpp core/src/winmidi.cpp core/src/alsamidi.cpp core/src/midi_stub.cpp
+  core/src/moduleart.cpp core/src/deviceinfo.cpp core/src/compare.cpp core/src/update.cpp core/src/settingsmeta.cpp core/src/designer.cpp core/src/midiparse.cpp core/src/live.cpp core/src/mixer.cpp core/src/modulewrite.cpp core/src/i18n.cpp core/src/bindings.cpp core/src/instrumentmodule.cpp core/src/printout.cpp)
 target_include_directories(joue_core PUBLIC core/include)
 target_link_libraries(joue_core PUBLIC pugixml::pugixml)
 find_package(Threads REQUIRED)
@@ -71,7 +71,7 @@ if(APPLE)
   target_compile_definitions(imgui_lib PUBLIC GL_SILENCE_DEPRECATION)
 endif()
 
-add_library(editor_lib STATIC app/editor.cpp app/designer.cpp app/blobdraw.cpp app/liveview.cpp app/updatecheck.cpp app/texture.cpp app/logo.cpp)
+add_library(editor_lib STATIC app/editor.cpp app/designer.cpp app/blobdraw.cpp app/liveview.cpp app/mixerbridge.cpp app/updatecheck.cpp app/texture.cpp app/logo.cpp)
 target_include_directories(editor_lib PRIVATE third_party)
 if(MSVC)
   set_source_files_properties(app/texture.cpp PROPERTIES COMPILE_OPTIONS "/W0")

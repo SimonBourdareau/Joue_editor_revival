@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cfloat>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -18,6 +19,9 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <bitset>
+#include <map>
+#include <set>
 #include <sstream>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -490,10 +494,16 @@ Editor::Editor(EditorOptions options) : options_(std::move(options)) {
         return std::make_pair(false, joue::Bytes());
     };
     live_.onEdit = [this](int slot, const joue::Bytes& blob) { openModuleFromInstrument(slot, blob); };
+    live_.mackieName = [this](const joue::Bytes& blob) { return mackiePresetFor(blob); };
     aboutPopup_ = options_.about;
     live_.safeGraphics = options_.safeGraphics;
     loadUiSettings();
+    applyMixerSpeed();
+    mixer_.setOptions(mixerOptions_);
+    if (mixerSwapManual_) mixer_.setPairsSwapped(mixerSwapValue_);
+    mixer_.setFaderMode(static_cast<joue::mixer::FaderMode>(mixerMode_));
     if (options_.noTouches) live_.listenToPlay = false;
+    live_.setPlayHook([this](const joue::Bytes& message) { mixer_.fromSurface(message); });
     live_.open = true;  // the live instrument is part of the window; Hide in it or View > Live instrument closes it
     if (!options_.designer.empty()) {
         designer_.open = true;
@@ -547,9 +557,167 @@ void Editor::rebuildObserved() {
     });
 }
 
-void Editor::loadRoot(std::unique_ptr<Node> root, const std::string& message) {
+// The Mackie presets are built in: the folder is made again at every start from the preset files that come with the program, right after
+// the Play presets, open and locked (Duplicate makes an editable copy), so it always follows the version of the program.
+void Editor::addMackieFolder() {
+    if (!root_ || !moduleList(*root_)) return;
+    std::string factory = findPresets();
+    if (factory.empty()) return;
+    fs::path directory = fs::path(factory).parent_path();
+    std::vector<std::unique_ptr<Node>> modules;
+    std::vector<MackiePreset> known;
+    std::map<int, std::shared_ptr<Node>> references;
+    try {
+        std::unique_ptr<Node> factoryLibrary = joue::parseLibrary(readFile(factory));
+        walk(*factoryLibrary, [&](Node& n) {
+            if (n.tag != "Module") return;
+            int type = std::atoi(stringValue(n, "Type").c_str());
+            if (!references.count(type)) references[type] = std::shared_ptr<Node>(n.clone().release());
+        });
+    } catch (const std::exception&) {
+    }
+    for (const char* file : {"scaler-mixer.xml", "mackie-presets.xml"}) {
+        fs::path path = directory / file;
+        std::error_code ec;
+        if (!fs::exists(path, ec)) continue;
+        try {
+            std::unique_ptr<Node> source = joue::parseLibrary(readFile(path.string()));
+            walk(*source, [&](Node& n) {
+                if (n.tag != "Module") return;
+                std::unique_ptr<Node> copy = n.clone();
+                setString(*copy, "ReadOnly", "1");
+                MackiePreset preset;
+                preset.type = std::atoi(stringValue(*copy, "Type").c_str());
+                preset.name = n.name();
+                const std::string untried = " (untried)";
+                if (preset.name.size() > untried.size() && preset.name.compare(preset.name.size() - untried.size(), untried.size(), untried) == 0) preset.name.erase(preset.name.size() - untried.size());
+                preset.node = copy->clone();
+                auto reference = references.find(preset.type);
+                if (reference != references.end()) preset.reference = reference->second;
+                known.push_back(std::move(preset));
+                modules.push_back(std::move(copy));
+            });
+        } catch (const std::exception&) {
+        }
+    }
+    if (modules.empty()) return;
+    {
+        std::lock_guard<std::mutex> lock(mackieMutex_);
+        mackiePresets_ = std::move(known);
+    }
+    auto& top = entriesOf(*moduleList(*root_));
+    for (std::size_t i = top.size(); i-- > 0;) {
+        if (top[i]->tag == "Folder" && top[i]->name() == "Mackie presets") top.erase(top.begin() + static_cast<std::ptrdiff_t>(i));
+    }
+    auto folder = std::make_unique<Node>();
+    folder->tag = "Folder";
+    folder->attrs = {{"name", "Mackie presets"}};
+    setString(*folder, "IsExpanded", "1");
+    auto& inside = entriesOf(*folder);
+    for (auto& module : modules) inside.push_back(std::move(module));
+    std::size_t at = top.size();
+    for (std::size_t i = 0; i < top.size(); ++i) {
+        if (top[i]->tag == "Folder" && top[i]->name() == "Play Factory presets") at = i + 1;
+    }
+    top.insert(top.begin() + static_cast<std::ptrdiff_t>(at), std::move(folder));
+}
+
+namespace {
+
+// A module made in the module designer whose pads all send Mackie Control notes is a Mackie Control module too.
+std::pair<std::string, std::string> customMackieLayout(const joue::Bytes& blob) {
+    try {
+        joue::Design design = joue::Design::fromBytes(blob);
+        int pads = 0;
+        for (std::size_t k = 0; k < design.count(); ++k) {
+            if (!design.hasBox(k)) continue;
+            joue::ElementHeader h = design.header(k);
+            if (h.type != joue::element::Pad) continue;
+            int note = -1;
+            for (const joue::FieldSpec& f : joue::bodyFields(h.type, h.version)) {
+                if (std::string(f.name) == "Note") note = design.field(k, f);
+            }
+            if (note < 0 || joue::mixer::noteName(note).empty()) return {};
+            ++pads;
+        }
+        if (pads > 0) return {"Custom Mackie Control layout", ""};
+    } catch (const std::exception&) {
+    }
+    return {};
+}
+
+}  // namespace
+
+// The name of the Mackie Control preset that a module's bytes carry: the settings in which that preset differs from the factory preset are there.
+std::pair<std::string, std::string> Editor::mackiePresetFor(const joue::Bytes& blob) {
+    if (blob.size() < 12) return {};
+    const joue::ModuleBindings* bindings = joue::moduleBindings(blob[0]);
+    if (!bindings) return customMackieLayout(blob);
+    std::lock_guard<std::mutex> lock(mackieMutex_);
+    std::pair<std::string, std::string> best;
+    int bestAgree = 0, bestDisagree = 0;
+    for (MackiePreset& preset : mackiePresets_) {
+        if (preset.type != blob[0] || !preset.node || !preset.reference) continue;
+        try {
+            int agree = 0, disagree = 0;
+            if (!joue::presetHolds(*bindings, blob, *preset.node, *preset.reference, &agree, &disagree)) continue;
+            if (best.first.empty() || disagree < bestDisagree || (disagree == bestDisagree && agree > bestAgree)) {
+                best = {preset.name, preset.reference->name()};
+                bestAgree = agree;
+                bestDisagree = disagree;
+            }
+        } catch (const std::exception&) {
+        }
+    }
+    return best;
+}
+
+// What a bug report needs, as one text in English: the version, the device information, the detection log, the modules and Mackie Control.
+std::string Editor::bugReportText() {
+#if defined(_WIN32)
+    const char* system = "Windows";
+#elif defined(__APPLE__)
+    const char* system = "macOS";
+#else
+    const char* system = "Linux";
+#endif
+    std::string text = std::string("Joue Revival ") + about::Version + " (" + system + "), language " + joue::i18n::languageCode(joue::i18n::language()) + "\n\n";
+    text += "## Device information\n";
+    std::vector<std::pair<std::string, std::string>> info = live_.deviceInfo();
+    if (info.empty()) text += "(not read yet: View > Device information, then Read again)\n";
+    for (const auto& line : info) text += line.first + ": " + line.second + "\n";
+    text += "\n## Modules on the instrument\n";
+    std::vector<LiveView::LiveModule> modules = live_.modules();
+    if (modules.empty()) text += "(none detected)\n";
+    for (const LiveView::LiveModule& m : modules) {
+        if (m.raw.size() < 4) continue;
+        text += "slot " + std::to_string(m.slot) + ": " + joue::moduleName(m.raw[0]) + ", type " + std::to_string(m.raw[0]) + ", version " + std::to_string(m.raw[1]) + ", " + std::to_string(m.raw.size()) + " bytes";
+        std::pair<std::string, std::string> mackie = mackiePresetFor(m.raw);
+        if (!mackie.first.empty()) text += ", Mackie Control: " + mackie.first;
+        text += "\n";
+    }
+    text += "\n## Detection log\n";
+    std::vector<std::string> log = live_.logLines();
+    if (log.empty()) text += "(empty)\n";
+    for (const std::string& line : log) text += line + "\n";
+    MixerBridge::View view = mixer_.view();
+    text += "\n## Mackie Control\n";
+    text += std::string("switched on: ") + (mixer_.enabled ? "yes" : "no") + ", connected: " + (view.connected ? "yes" : "no") + ", pass-through: " + (mixerOptions_.passThrough ? "yes" : "no") + ", own port: " + (mixerVirtual_ ? "yes" : "no") + "\n";
+    text += "received " + std::to_string(view.received) + ", sent " + std::to_string(view.sent) + ", from the DAW " + std::to_string(view.fromDaw) + "\n";
+    std::size_t from = view.lines.size() > 40 ? view.lines.size() - 40 : 0;
+    for (std::size_t i = from; i < view.lines.size(); ++i) text += view.lines[i].text + "\n";
+    return text;
+}
+
+void Editor::copyBugReport() {
+    ImGui::SetClipboardText(bugReportText().c_str());
+    setStatus("Bug report copied to the clipboard: paste it in a GitHub issue.");
+}
+
+void Editor::loadRoot(std::unique_ptr<Node> root, const std::string& message, bool builtIns) {
     root_ = std::move(root);
     joue::lockFactoryPresets(*root_);
+    if (builtIns) addMackieFolder();
     selected_ = nullptr;
     dirty_ = false;
     undo_.clear();
@@ -974,6 +1142,7 @@ void Editor::draw() {
     drawPopups();
     drawAbout();
     drawDeviceInfoWindow();
+    drawMixerWindow();
     drawHelp();
     drawComparePopup();
     ImGui::End();
@@ -1333,9 +1502,49 @@ void Editor::drawInstrumentPanel(Node& module, InstrumentLink& link) {
 void Editor::loadUiSettings() {
     std::ifstream in(fs::path(options_.dataDir) / "ui.txt");
     std::string line;
+    bool virtualSeen = false, virtualValue = true, legacyPorts = false;
     while (std::getline(in, line)) {
         if (line == "listenToPlay=0") live_.listenToPlay = false;
         if (line == "listenToPlay=1") live_.listenToPlay = true;
+        if (line == "mixerAuto=0") mixerAuto_ = false;
+        if (line == "mixerAuto=1") mixerAuto_ = true;
+        if (line == "mixerAutoOpen=0") mixerAutoOpen_ = false;
+        if (line == "mixerAutoOpen=1") mixerAutoOpen_ = true;
+        if (line.rfind("mixerBank=", 0) == 0) mixerOptions_.bankStep = line.substr(10) == "1" ? joue::mixer::BankStep::Bank : joue::mixer::BankStep::Channel;
+        if (line.rfind("mixerBubble=", 0) == 0) {
+            int value = std::atoi(line.substr(12).c_str());
+            if (value >= 0 && value <= 4) mixerOptions_.bubbleSideways = static_cast<joue::mixer::BubbleSideways>(value);
+        }
+        if (line.rfind("mixerVertical=", 0) == 0) {
+            int value = std::atoi(line.substr(14).c_str());
+            if (value >= 0 && value <= 3) mixerOptions_.bubbleVertical = static_cast<joue::mixer::BubbleVertical>(value);
+        }
+        if (line == "mixerLayout=1") mixerOptions_.keyLayout = joue::mixer::KeyLayout::Selects;
+        if (line == "mixerLayout=0") mixerOptions_.keyLayout = joue::mixer::KeyLayout::Functions;
+        if (line.rfind("mixerMode=", 0) == 0) mixerMode_ = std::max(0, std::min(2, std::atoi(line.substr(10).c_str())));
+        if (line == "mixerVirtual=1" || line == "mixerVirtual=0") {
+            virtualSeen = true;
+            virtualValue = line == "mixerVirtual=1";
+        }
+        if (line.rfind("mixerKeys=", 0) == 0) mixerOptions_.rightKeys = line.substr(10) == "1" ? joue::mixer::RightKeys::Select : joue::mixer::RightKeys::Move;
+        if (line.rfind("mixerDead=", 0) == 0) mixerOptions_.deadZone = std::max(8, std::min(50, std::atoi(line.substr(10).c_str())));
+        if (line.rfind("mixerSpeed=", 0) == 0) mixerSpeed_ = std::max(0, std::min(2, std::atoi(line.substr(11).c_str())));
+        if (line == "mixerPass=1") mixerOptions_.passThrough = true;
+        if (line == "mixerSwap=1" || line == "mixerSwap=0") {
+            mixerSwapManual_ = true;
+            mixerSwapValue_ = line == "mixerSwap=1";
+        }
+        if (line == "mixerFaders=1") mixerOptions_.faders = joue::mixer::Faders::Sixteen;
+        if (line == "mixerFaders=0") mixerOptions_.faders = joue::mixer::Faders::Eight;
+        if (line == "mixerExtFirst=1") mixerOptions_.extenderFirst = true;
+        if (line == "mixerExtFirst=0") mixerOptions_.extenderFirst = false;
+        if (line.rfind("mixerOut2=", 0) == 0) mixerOut2Name_ = line.substr(10);
+        if (line.rfind("mixerIn2=", 0) == 0) mixerIn2Name_ = line.substr(9);
+        if (line.rfind("mixerOut=", 0) == 0) {
+            mixerOutName_ = line.substr(9);
+            legacyPorts = true;
+        }
+        if (line.rfind("mixerIn=", 0) == 0) mixerInName_ = line.substr(8);
         if (line == "touchSelect=0") touchSelect_ = false;
         if (line == "touchSelect=1") touchSelect_ = true;
         if (line == "welcome=1") welcomeSeen_ = true;
@@ -1346,6 +1555,7 @@ void Editor::loadUiSettings() {
             languageChosen_ = true;
         }
     }
+    mixerVirtual_ = virtualSeen ? virtualValue : !legacyPorts;
     if (!options_.language.empty()) joue::i18n::setLanguage(joue::i18n::languageFromCode(options_.language));
     else if (!languageChosen_) joue::i18n::setLanguage(joue::i18n::detectSystemLanguage());
     if (!welcomeSeen_ && options_.library.empty() && options_.designer.empty() && !options_.about && !options_.noUpdateCheck) helpOpen_ = true;
@@ -1356,6 +1566,25 @@ void Editor::saveUiSettings() const {
         fs::create_directories(options_.dataDir);
         std::ofstream out(fs::path(options_.dataDir) / "ui.txt");
         out << "listenToPlay=" << (live_.listenToPlay ? 1 : 0) << "\n";
+        out << "mixerAuto=" << (mixerAuto_ ? 1 : 0) << "\n";
+        out << "mixerAutoOpen=" << (mixerAutoOpen_ ? 1 : 0) << "\n";
+        out << "mixerBubble=" << static_cast<int>(mixerOptions_.bubbleSideways) << "\n";
+        out << "mixerBank=" << static_cast<int>(mixerOptions_.bankStep) << "\n";
+        out << "mixerVertical=" << static_cast<int>(mixerOptions_.bubbleVertical) << "\n";
+        out << "mixerKeys=" << static_cast<int>(mixerOptions_.rightKeys) << "\n";
+        out << "mixerDead=" << mixerOptions_.deadZone << "\n";
+        out << "mixerSpeed=" << mixerSpeed_ << "\n";
+        out << "mixerLayout=" << static_cast<int>(mixerOptions_.keyLayout) << "\n";
+        out << "mixerMode=" << mixerMode_ << "\n";
+        out << "mixerVirtual=" << (mixerVirtual_ ? 1 : 0) << "\n";
+        out << "mixerFaders=" << static_cast<int>(mixerOptions_.faders) << "\n";
+        out << "mixerPass=" << (mixerOptions_.passThrough ? 1 : 0) << "\n";
+        if (mixerSwapManual_) out << "mixerSwap=" << (mixerSwapValue_ ? 1 : 0) << "\n";
+        out << "mixerExtFirst=" << (mixerOptions_.extenderFirst ? 1 : 0) << "\n";
+        if (!mixerOut2Name_.empty()) out << "mixerOut2=" << mixerOut2Name_ << "\n";
+        if (!mixerIn2Name_.empty()) out << "mixerIn2=" << mixerIn2Name_ << "\n";
+        if (!mixerOutName_.empty()) out << "mixerOut=" << mixerOutName_ << "\n";
+        if (!mixerInName_.empty()) out << "mixerIn=" << mixerInName_ << "\n";
         out << "touchSelect=" << (touchSelect_ ? 1 : 0) << "\n";
         out << "welcome=" << (welcomeSeen_ ? 1 : 0) << "\n";
         out << "checkUpdates=" << (checkUpdates_ ? 1 : 0) << "\n";
@@ -1413,9 +1642,10 @@ std::string findDocument(const std::string& name) {
     return {};
 }
 
-void Editor::openGuide(bool designer) {
+void Editor::openGuide(int which) {
     bool french = joue::i18n::language() == joue::i18n::Language::French;
-    std::string name = std::string(designer ? "module-designer" : "user-guide") + (french ? ".fr.md" : ".md");
+    const char* base = which == 1 ? "module-designer" : (which == 2 ? "mixer-bridge" : "user-guide");
+    std::string name = std::string(base) + (french ? ".fr.md" : ".md");
     std::string path = findDocument(name);
     openExternal(path.empty() ? std::string("https://github.com/") + about::Repository + "/blob/main/docs/" + name : path);
 }
@@ -1440,6 +1670,684 @@ void Editor::pollUpdateCheck() {
         setStatus(ok ? "You have the latest version." : "Could not check for updates.", !ok);
     }
     updateManual_ = false;
+}
+
+void Editor::applyMixerSpeed() {
+    const double delays[3] = {900.0, 700.0, 500.0};
+    const double repeats[3] = {700.0, 500.0, 300.0};
+    mixerOptions_.repeatDelayMs = delays[mixerSpeed_];
+    mixerOptions_.repeatMs = repeats[mixerSpeed_];
+}
+
+void Editor::refreshMixerPorts() {
+    mixerPortsRead_ = true;
+    try {
+        mixerPorts_ = joue::listEndpoints();
+        mixerPortsProblem_.clear();
+    } catch (const std::exception& error) {
+        mixerPorts_.clear();
+        mixerPortsProblem_ = error.what();
+    }
+}
+
+bool Editor::connectMixerPorts(std::string& problem) {
+    if (mixerVirtual_) return mixer_.connectVirtual("Joue Mackie", mixerOptions_.faders == joue::mixer::Faders::Sixteen ? "Joue Mackie 2" : "", problem);
+
+    if (!mixerPortsRead_) refreshMixerPorts();
+    const joue::EndpointInfo* toDaw = nullptr;
+    const joue::EndpointInfo* fromDaw = nullptr;
+    for (const joue::EndpointInfo& port : mixerPorts_) {
+        if (!port.isSource && port.displayName == mixerOutName_) toDaw = &port;
+        if (port.isSource && port.displayName == mixerInName_) fromDaw = &port;
+    }
+    if (!toDaw || !fromDaw) {
+        problem = "Choose the port to send to and the port to listen to.";
+        return false;
+    }
+    const joue::EndpointInfo* toExtender = nullptr;
+    const joue::EndpointInfo* fromExtender = nullptr;
+    if (mixerOptions_.faders == joue::mixer::Faders::Sixteen) {
+        for (const joue::EndpointInfo& port : mixerPorts_) {
+            if (!port.isSource && port.displayName == mixerOut2Name_) toExtender = &port;
+            if (port.isSource && port.displayName == mixerIn2Name_) fromExtender = &port;
+        }
+        if (!toExtender || !fromExtender) {
+            problem = "Choose the two ports of the second unit as well.";
+            return false;
+        }
+    }
+    return mixer_.connect(*toDaw, *fromDaw, toExtender, fromExtender, problem);
+}
+
+namespace {
+
+std::string surfaceLabel(int note) {
+    std::string text = joue::mixer::noteName(note);
+    if (text.empty()) return "#" + std::to_string(note);
+    auto replace = [&](const std::string& from, const std::string& to) {
+        std::size_t at = text.find(from);
+        if (at != std::string::npos) text.replace(at, from.size(), to);
+    };
+    replace("record arm", "arm");
+    replace("fast forward", "ff");
+    replace("channel left", "ch <");
+    replace("channel right", "ch >");
+    replace("bank left", "bank <");
+    replace("bank right", "bank >");
+    replace("cursor ", "");
+    for (char& c : text) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    return text;
+}
+
+bool surfaceLamp(int note, const joue::mixer::SurfaceState& host) {
+    if (note >= 0 && note < 8) return host.record[static_cast<std::size_t>(note)];
+    if (note >= 8 && note < 16) return host.solo[static_cast<std::size_t>(note - 8)];
+    if (note >= 16 && note < 24) return host.mute[static_cast<std::size_t>(note - 16)];
+    if (note >= 24 && note < 32) return host.select[static_cast<std::size_t>(note - 24)];
+    if (note == 94) return host.play;
+    if (note == 93) return host.stop;
+    if (note == 95) return host.recording;
+    return false;
+}
+
+}  // namespace
+
+// The Mackie Control window for modules that already send Mackie Control messages: the module itself, each control with what it does, lit when
+// it is pressed and with the lamps and the faders of the DAW.
+void Editor::drawMackieSurfaces(const MixerBridge::View& view, const std::vector<LiveView::MackieSurface>& surfaces, float scale) {
+    static const std::set<std::string> tried = {"Mackie Control: Matrix", "Mackie Control: Grand Clavier", "Mackie Control: Scaler"};
+    const ImVec4 amber(1.0f, 0.72f, 0.3f, 1.0f);
+    for (const LiveView::MackieSurface& surface : surfaces) {
+        ImGui::TextUnformatted(surface.preset.c_str());
+        if (!surface.original.empty() && !tried.count(surface.preset)) {
+            ImGui::SameLine();
+            ImGui::TextColored(amber, "%s", tr("not tried yet on a real module"));
+        }
+    }
+    ImGui::TextDisabled("%s", tr("The Mackie Control messages that the module sends are passed on to the DAW unchanged; the lamps are the DAW's."));
+    ImDrawList* list = ImGui::GetWindowDrawList();
+    float room = ImGui::GetContentRegionAvail().x - 8.0f * scale;
+    float ppm = std::min(room / (3.0f * joue::SlotWidthMm), 3.4f * scale);
+    ImVec2 origin = ImGui::GetCursorScreenPos() + ImVec2(0.0f, 4.0f * scale);
+    for (const LiveView::MackieSurface& surface : surfaces) {
+        const joue::PlacedModule& placed = surface.placed;
+        auto setting = [&](const std::string& scope, const std::string& key) -> const std::string* {
+            auto it = surface.settings.find({scope, key});
+            return it == surface.settings.end() ? nullptr : &it->second;
+        };
+        ImVec2 corner = origin + ImVec2(static_cast<float>(placed.firstSlot - 1) * joue::SlotWidthMm * ppm, 0.0f);
+        ImVec2 end = corner + ImVec2(static_cast<float>(placed.slots) * joue::SlotWidthMm * ppm, joue::SurfaceHeightMm * ppm);
+        list->AddRectFilled(corner, end, IM_COL32(20, 20, 24, 255), 4.0f);
+        list->AddRect(corner, end, IM_COL32(120, 120, 126, 255), 4.0f);
+        std::vector<std::size_t> order(surface.design.count());
+        for (std::size_t k = 0; k < order.size(); ++k) order[k] = k;
+        std::stable_sort(order.begin(), order.end(), [&](std::size_t x, std::size_t y) { return surface.design.header(x).layer < surface.design.header(y).layer; });
+        for (std::size_t k : order) {
+            if (!surface.design.hasBox(k)) continue;
+            joue::ElementHeader h = surface.design.header(k);
+            if (h.type == joue::element::Glide) continue;
+            // the pictures are drawn flipped top to bottom, as everywhere in the program: the keys are nearest to the player
+            float top = joue::MirrorPictures ? joue::SurfaceHeightMm - static_cast<float>(h.y + h.height) : static_cast<float>(h.y);
+            ImVec2 a = corner + ImVec2(static_cast<float>(h.x) * ppm, top * ppm);
+            ImVec2 b = a + ImVec2(static_cast<float>(h.width) * ppm, static_cast<float>(h.height) * ppm);
+            std::string name = k < surface.names.size() ? surface.names[k] : std::string();
+            int note = -1, fader = -1;
+            if (!name.empty()) {
+                const std::string* function = setting(name, "Function");
+                if (function && *function == "Note") {
+                    if (const std::string* value = setting(name, "Note")) note = std::atoi(value->c_str());
+                } else if (function && *function == "Pitchbend") {
+                    if (const std::string* value = setting(name, "PitchbendChannel")) fader = std::atoi(value->c_str()) - 1;
+                }
+            }
+            bool isKey = surface.keys > 0 && h.id >= 1 && h.id <= surface.keys && (h.type == joue::element::Pad || h.type == joue::element::Key);
+            if (note < 0 && fader < 0 && isKey) {
+                if (const std::string* base = setting("ALL_KEYS", "Note")) note = std::atoi(base->c_str()) + h.id - 1;
+            }
+            // a module the program has no description of (one made in the designer) is read from its own pads
+            if (note < 0 && fader < 0 && surface.settings.empty() && k < surface.notes.size() && surface.notes[k] >= 0) note = surface.notes[k];
+            bool jog = false;
+            if (h.type == joue::element::Strip && !name.empty()) {
+                const std::string* cc = setting(name, "CC");
+                jog = cc && std::atoi(cc->c_str()) == joue::mixer::Layout().stripCc;
+            }
+            bool off = note >= 0 && note < 128 && view.options.blockedNotes[static_cast<std::size_t>(note)];
+            if (off) note = -1;
+            bool known = note >= 0 || jog || (fader >= 0 && fader <= joue::mixer::StripCount);
+            bool down = (note >= 0 && note < 128 && view.snapshot.notesDown[static_cast<std::size_t>(note)]) || (jog && view.snapshot.stripActive);
+            bool lamp = note >= 0 && surfaceLamp(note, view.host);
+            ImU32 fill = down ? IM_COL32(110, 170, 235, 255) : (lamp ? IM_COL32(205, 170, 50, 255) : (known ? IM_COL32(46, 52, 68, 255) : IM_COL32(30, 30, 34, 255)));
+            if (h.type == joue::element::Area || h.type == joue::element::Round) {
+                ImVec2 centre((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+                float radius = std::min(b.x - a.x, b.y - a.y) * 0.5f;
+                list->AddCircleFilled(centre, radius, fill, 32);
+                list->AddCircle(centre, radius, IM_COL32(120, 120, 126, 255), 32);
+            } else {
+                list->AddRectFilled(a, b, fill, 3.0f);
+                list->AddRect(a, b, IM_COL32(120, 120, 126, 255), 3.0f);
+            }
+            if (fader >= 0 && fader <= joue::mixer::StripCount) {
+                float level = static_cast<float>(view.snapshot.fader[static_cast<std::size_t>(fader)]) / 16383.0f;
+                float top = b.y - 2.0f - level * (b.y - a.y - 4.0f);
+                if (h.type == joue::element::Area || h.type == joue::element::Round) {
+                    // a round control fills like a glass: the level is the part of the circle below it
+                    list->PushClipRect(ImVec2(a.x, top), ImVec2(b.x, b.y), true);
+                    list->AddCircleFilled(ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), std::min(b.x - a.x, b.y - a.y) * 0.5f - 2.0f, IM_COL32(80, 130, 180, 255), 32);
+                    list->PopClipRect();
+                } else {
+                    list->AddRectFilled(ImVec2(a.x + 2.0f, top), ImVec2(b.x - 2.0f, b.y - 2.0f), IM_COL32(80, 130, 180, 255), 2.0f);
+                }
+                int reported = view.host.fader[static_cast<std::size_t>(fader)];
+                if (view.host.faderKnown[static_cast<std::size_t>(fader)]) {
+                    float y = b.y - 2.0f - static_cast<float>(reported) / 16383.0f * (b.y - a.y - 4.0f);
+                    list->AddLine(ImVec2(a.x - 2.0f, y), ImVec2(b.x + 2.0f, y), IM_COL32(255, 190, 70, 255), 2.0f);
+                }
+            }
+            std::string label = jog ? std::string("JOG") : (note >= 0 ? surfaceLabel(note) : (fader >= 0 ? "FADER " + std::to_string(fader + 1) : std::string()));
+            if (label.empty()) continue;
+            ImVec2 size = ImGui::CalcTextSize(label.c_str());
+            float width = b.x - a.x;
+            ImU32 colour = down ? IM_COL32(0, 0, 0, 255) : IM_COL32(225, 225, 230, 255);
+            // a white key of a keyboard is labelled at its front end, where no black key covers it; a label wider than its control is made smaller
+            bool front = isKey && h.layer <= 2;
+            std::size_t space = label.find(' ');
+            bool split = size.x > width - 2.0f && space != std::string::npos;
+            std::string first = split ? label.substr(0, space) : label, second = split ? label.substr(space + 1) : std::string();
+            float widest = std::max(ImGui::CalcTextSize(first.c_str()).x, second.empty() ? 0.0f : ImGui::CalcTextSize(second.c_str()).x);
+            float factor = widest > width - 2.0f ? std::max(0.6f, (width - 2.0f) / widest) : 1.0f;
+            float fontSize = ImGui::GetFontSize() * factor;
+            float lineHeight = ImGui::GetTextLineHeight() * factor;
+            float lines = split ? 2.0f : 1.0f;
+            float middle = front ? b.y - 5.0f * scale - lines * lineHeight * 0.5f : (a.y + b.y) * 0.5f;
+            if (fader >= 0) middle = a.y + 3.0f * scale + lineHeight * 0.5f;
+            auto put = [&](const std::string& text, float centreY) {
+                ImVec2 extent = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text.c_str());
+                list->AddText(ImGui::GetFont(), fontSize, ImVec2((a.x + b.x) * 0.5f - extent.x * 0.5f, centreY - extent.y * 0.5f), colour, text.c_str());
+            };
+            if (split) {
+                put(first, middle - lineHeight * 0.5f);
+                put(second, middle + lineHeight * 0.5f);
+            } else {
+                put(first, middle);
+            }
+        }
+    }
+    ImGui::Dummy(ImVec2(3.0f * joue::SlotWidthMm * ppm, joue::SurfaceHeightMm * ppm + 10.0f * scale));
+    ImGui::Text(tr("Received %llu, sent %llu."), view.received, view.sent);
+}
+
+void Editor::drawMixerScaler(const MixerBridge::View& view, float scale) {
+    const bool mixerModule = live_.mixerModulePresent();
+    (void)mixerModule;
+    ImDrawList* list = ImGui::GetWindowDrawList();
+    int shownStrips = std::min(joue::mixer::MaxStrips, view.shownStrips);
+    const bool narrow = shownStrips > 9;
+    const float width = (narrow ? 24.0f : 34.0f) * scale, height = 130.0f * scale, gap = (narrow ? 9.0f : 16.0f) * scale;
+    ImVec2 origin = ImGui::GetCursorScreenPos();
+    for (int column = 0; column <= shownStrips; ++column) {
+        bool master = column == 0;
+        int i = master ? joue::mixer::MasterSlot : column - 1;
+        int key = master ? joue::mixer::MasterKey : joue::mixer::FirstFaderKey + i;
+        int unit = master ? 0 : ((i / joue::mixer::StripCount) ^ ((view.options.faders == joue::mixer::Faders::Sixteen && view.options.extenderFirst) ? 1 : 0));
+        std::size_t strip = static_cast<std::size_t>(master ? joue::mixer::MasterFader : i % joue::mixer::StripCount);
+        const joue::mixer::SurfaceState& hostState = unit == 0 ? view.host : view.extender;
+        ImVec2 a = origin + ImVec2(static_cast<float>(column) * (width + gap) + (master ? 0.0f : gap), 22.0f * scale);
+        ImVec2 b = a + ImVec2(width, height);
+        bool touched = view.snapshot.touched[static_cast<std::size_t>(key)];
+        list->AddRectFilled(a, b, IM_COL32(28, 28, 32, 255), 3.0f);
+        float level = static_cast<float>(view.snapshot.fader[static_cast<std::size_t>(i)]) / 16383.0f;
+        list->AddRectFilled(ImVec2(a.x + 2.0f, b.y - 2.0f - level * (height - 4.0f)), ImVec2(b.x - 2.0f, b.y - 2.0f), touched ? IM_COL32(120, 200, 255, 255) : IM_COL32(80, 130, 180, 255), 2.0f);
+        list->AddRect(a, b, touched ? IM_COL32(255, 255, 255, 255) : IM_COL32(120, 120, 126, 255), 3.0f, 0, touched ? 2.0f : 1.0f);
+        int hostFader = hostState.fader[strip];
+        if (hostFader > 0) {
+            float y = b.y - 2.0f - (static_cast<float>(hostFader) / 16383.0f) * (height - 4.0f);
+            list->AddLine(ImVec2(a.x - 3.0f, y), ImVec2(b.x + 3.0f, y), IM_COL32(255, 190, 70, 255), 2.0f);
+        }
+        std::string name = master ? std::string(tr("Master")) : hostState.names[strip];
+        if (name.empty()) name = std::to_string(i + 1);
+        if (narrow && name.size() > 4) name.resize(4);
+        list->AddText(ImVec2(a.x, a.y - 18.0f * scale), IM_COL32(200, 200, 205, 255), name.c_str());
+        if (!master) {
+            bool eight = view.options.faders == joue::mixer::Faders::Eight;
+            bool selectKey = eight && i < (view.options.rightKeys == joue::mixer::RightKeys::Move ? 6 : 8) && view.snapshot.touched[static_cast<std::size_t>(joue::mixer::FirstSelectKey + i)];
+            bool selected = selectKey || hostState.select[strip];
+            ImVec2 centre(a.x + width * 0.5f, b.y + 14.0f * scale);
+            list->AddCircleFilled(centre, 6.0f * scale, selected ? IM_COL32(255, 220, 90, 255) : IM_COL32(50, 50, 56, 255));
+            list->AddCircle(centre, 6.0f * scale, IM_COL32(120, 120, 126, 255));
+            int meter = hostState.meter[strip];
+            if (meter > 0) list->AddRectFilled(ImVec2(b.x + 2.0f, b.y - static_cast<float>(meter) / 14.0f * height), ImVec2(b.x + 5.0f * scale, b.y), IM_COL32(110, 220, 110, 255));
+            struct Lamp {
+                const char* letter;
+                bool on;
+                ImU32 colour;
+            };
+            std::array<Lamp, 3> lamps{{{"R", hostState.record[strip], IM_COL32(235, 70, 60, 255)}, {"S", hostState.solo[strip], IM_COL32(240, 200, 60, 255)}, {"M", hostState.mute[strip], IM_COL32(70, 140, 235, 255)}}};
+            const float lampSize = narrow ? 8.0f * scale : 11.0f * scale;
+            for (std::size_t k = 0; k < lamps.size(); ++k) {
+                ImVec2 la(a.x + 0.5f * scale + static_cast<float>(k) * (lampSize + 1.0f * scale), b.y + 28.0f * scale);
+                ImVec2 lb = la + ImVec2(lampSize, lampSize);
+                list->AddRectFilled(la, lb, lamps[k].on ? lamps[k].colour : IM_COL32(40, 40, 46, 255), 2.0f);
+                list->AddRect(la, lb, IM_COL32(100, 100, 106, 255), 2.0f);
+                if (!narrow) list->AddText(la + ImVec2(2.5f * scale, -1.5f * scale), lamps[k].on ? IM_COL32(0, 0, 0, 255) : IM_COL32(130, 130, 136, 255), lamps[k].letter);
+            }
+            if (!narrow) {
+                std::string value = hostState.bottomLine.substr(strip * 7, 7);
+                list->AddText(ImVec2(a.x - 3.0f * scale, b.y + 44.0f * scale), IM_COL32(190, 190, 120, 255), value.c_str());
+            }
+        }
+    }
+    float rowEnd = height + 70.0f * scale;
+    ImGui::Dummy(ImVec2(static_cast<float>(shownStrips + 1) * (width + gap) + gap, rowEnd));
+    {
+        ImDrawList* keyList = ImGui::GetWindowDrawList();
+        ImVec2 start = ImGui::GetCursorScreenPos();
+        const float keyWidth = 40.0f * scale, keyHeight = 38.0f * scale, keyGap = 4.0f * scale;
+        const bool functions = view.options.faders == joue::mixer::Faders::Eight && view.options.keyLayout == joue::mixer::KeyLayout::Functions;
+        const bool sixteen = view.options.faders == joue::mixer::Faders::Sixteen;
+        static const char* faderLabels[8] = {"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"};
+        static const char* selectLabels[8] = {"SEL1", "SEL2", "SEL3", "SEL4", "SEL5", "SEL6", "SEL7", "SEL8"};
+        static const char* topFunctions[8] = {"FINE", "SHIFT", "STOP", "REW", "FF", "SOLO", "MUTE", "ARM"};
+        static const char* bottomFunctions[8] = {"", "", "LOOP", "PNCH", "UNDO", "REDO", "MODE", "CLIK"};
+        for (int k = 0; k < joue::mixer::KeyCount; ++k) {
+            std::string top, bottom;
+            if (k == 0) top = "MSTR";
+            else if (sixteen || k < joue::mixer::FirstSelectKey) top = sixteen ? std::to_string(k) : faderLabels[k - 1];
+            else if (functions) {
+                top = topFunctions[k - joue::mixer::FirstSelectKey];
+                bottom = bottomFunctions[k - joue::mixer::FirstSelectKey];
+            } else if (k < joue::mixer::MoveLeftKey || view.options.rightKeys == joue::mixer::RightKeys::Select) top = selectLabels[k - joue::mixer::FirstSelectKey];
+            else top = k == joue::mixer::MoveLeftKey ? "<" : ">";
+            ImVec2 a(start.x + static_cast<float>(k) * (keyWidth + keyGap), start.y);
+            ImVec2 b = a + ImVec2(keyWidth, keyHeight);
+            bool down = view.snapshot.touched[static_cast<std::size_t>(k)];
+            bool latched = (functions && ((k == joue::mixer::FineKey && view.snapshot.fine) || (k == joue::mixer::ShiftKey && view.snapshot.shift)));
+            keyList->AddRectFilled(a, b, down || latched ? IM_COL32(70, 120, 180, 255) : IM_COL32(32, 32, 38, 255), 3.0f);
+            keyList->AddRect(a, b, IM_COL32(120, 120, 126, 255), 3.0f);
+            bool shifted = functions && view.snapshot.shift && k >= joue::mixer::FirstFunctionKey;
+            keyList->AddText(ImVec2(a.x + 3.0f * scale, a.y + 3.0f * scale), shifted ? IM_COL32(110, 110, 116, 255) : IM_COL32(225, 225, 230, 255), top.c_str());
+            if (!bottom.empty()) keyList->AddText(ImVec2(a.x + 3.0f * scale, a.y + keyHeight * 0.5f), shifted ? IM_COL32(255, 220, 120, 255) : IM_COL32(150, 150, 120, 255), bottom.c_str());
+        }
+        ImGui::Dummy(ImVec2(static_cast<float>(joue::mixer::KeyCount) * (keyWidth + keyGap), keyHeight + 6.0f * scale));
+    }
+
+    ImVec2 pad = ImGui::GetCursorScreenPos();
+    float side = 90.0f * scale;
+    ImVec2 box0 = pad, box1 = pad + ImVec2(side, side);
+    list->AddRectFilled(box0, box1, IM_COL32(28, 28, 32, 255), 3.0f);
+    float zone = static_cast<float>(view.options.deadZone) / 127.0f * side;
+    ImVec2 centre = box0 + ImVec2(side * 0.5f, side * 0.5f);
+    list->AddRect(centre - ImVec2(zone, zone), centre + ImVec2(zone, zone), IM_COL32(90, 90, 96, 255));
+    list->AddRect(box0, box1, IM_COL32(120, 120, 126, 255), 3.0f);
+    ImVec2 dot = box0 + ImVec2(static_cast<float>(view.snapshot.bubbleX) / 127.0f * side, (1.0f - static_cast<float>(view.snapshot.bubbleY) / 127.0f) * side);
+    list->AddCircleFilled(dot, 5.0f * scale, view.snapshot.bubbleActive ? IM_COL32(255, 220, 90, 255) : IM_COL32(110, 110, 116, 255));
+    ImGui::Dummy(ImVec2(side, side));
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    bool changed = false;
+    {
+        int sideways = static_cast<int>(mixerOptions_.bubbleSideways);
+        const char* modes[5] = {tr("select the previous or next track"), tr("move one channel"), tr("move one bank"), tr("nothing"), tr("the pan of the selected track")};
+        ImGui::TextUnformatted(tr("Bubble, left and right:"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(260.0f * scale);
+        if (ImGui::BeginCombo("##bubblesideways", modes[sideways])) {
+            for (int m = 0; m < 5; ++m) {
+                if (ImGui::Selectable(modes[m], m == sideways)) {
+                    mixerOptions_.bubbleSideways = static_cast<joue::mixer::BubbleSideways>(m);
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        int vertical = static_cast<int>(mixerOptions_.bubbleVertical);
+        const char* verticals[4] = {tr("the cursor up and down"), tr("nothing"), tr("one bank (up: the previous)"), tr("one track (up: the previous)")};
+        ImGui::TextUnformatted(tr("Bubble, up and down:"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(260.0f * scale);
+        if (ImGui::BeginCombo("##bubblevertical", verticals[vertical])) {
+            for (int m = 0; m < 4; ++m) {
+                if (ImGui::Selectable(verticals[m], m == vertical)) {
+                    mixerOptions_.bubbleVertical = static_cast<joue::mixer::BubbleVertical>(m);
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SetNextItemWidth(180.0f * scale);
+        if (ImGui::SliderInt(tr("how far to push the bubble"), &mixerOptions_.deadZone, 10, 50)) changed = true;
+        const char* speeds[3] = {tr("slow"), tr("normal"), tr("fast")};
+        ImGui::TextUnformatted(tr("Bubble, repeat:"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(110.0f * scale);
+        if (ImGui::BeginCombo("##bubblespeed", speeds[mixerSpeed_])) {
+            for (int m = 0; m < 3; ++m) {
+                if (ImGui::Selectable(speeds[m], m == mixerSpeed_)) {
+                    mixerSpeed_ = m;
+                    applyMixerSpeed();
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }
+    ImGui::Text("%s: %s", tr("Strip"), view.snapshot.stripActive ? tr("moving the jog") : tr("idle"));
+    {
+        int faders = static_cast<int>(mixerOptions_.faders);
+        const char* counts[2] = {tr("8 faders (one Mackie unit)"), tr("16 faders (two Mackie units)")};
+        ImGui::TextUnformatted(tr("Faders:"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(260.0f * scale);
+        if (ImGui::BeginCombo("##faders", counts[faders])) {
+            for (int m = 0; m < 2; ++m) {
+                if (ImGui::Selectable(counts[m], m == faders)) {
+                    mixerOptions_.faders = static_cast<joue::mixer::Faders>(m);
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (mixerOptions_.faders == joue::mixer::Faders::Sixteen && ImGui::Checkbox(tr("The second unit holds the first eight tracks"), &mixerOptions_.extenderFirst)) changed = true;
+        if (mixerOptions_.faders == joue::mixer::Faders::Sixteen) {
+            bool swapped = view.pairsSwapped;
+            if (ImGui::Checkbox(tr("The DAW's main unit is on the second pair of ports"), &swapped)) {
+                mixer_.setPairsSwapped(swapped);
+                mixerSwapManual_ = true;
+                mixerSwapValue_ = swapped;
+                saveUiSettings();
+            }
+            auto who = [&](int id) {
+                if (id == 0) return std::string(tr("nothing yet"));
+                if (id == 0x14) return std::string(tr("the main unit"));
+                if (id == 0x15) return std::string(tr("the extender"));
+                char hex[16];
+                std::snprintf(hex, sizeof hex, "0x%02X", id);
+                return std::string(hex);
+            };
+            if (view.connected) ImGui::TextDisabled("%s: %s. %s: %s.", tr("First pair of ports, the DAW says"), who(view.deviceOnFirstPair).c_str(), tr("second pair"), who(view.deviceOnSecondPair).c_str());
+        }
+        if (ImGui::Checkbox(tr("Pass the module's messages through unchanged (for the Mackie presets of the other modules)"), &mixerOptions_.passThrough)) changed = true;
+    }
+    if (mixerOptions_.faders == joue::mixer::Faders::Eight) {
+        int layout = static_cast<int>(mixerOptions_.keyLayout);
+        const char* layouts[2] = {tr("functions (fine, shift, stop, rewind, solo, mute, arm...)"), tr("track selects and moving keys")};
+        ImGui::TextUnformatted(tr("The eight keys on the right:"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(380.0f * scale);
+        if (ImGui::BeginCombo("##keylayout", layouts[layout])) {
+            for (int m = 0; m < 2; ++m) {
+                if (ImGui::Selectable(layouts[m], m == layout)) {
+                    mixerOptions_.keyLayout = static_cast<joue::mixer::KeyLayout>(m);
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        int faderMode = static_cast<int>(view.snapshot.faderMode);
+        const char* modeNames[3] = {tr("absolute"), tr("relative"), tr("hybrid")};
+        ImGui::TextUnformatted(tr("Fader mode:"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(130.0f * scale);
+        if (ImGui::BeginCombo("##fadermode", modeNames[faderMode])) {
+            for (int m = 0; m < 3; ++m) {
+                if (ImGui::Selectable(modeNames[m], m == faderMode)) {
+                    mixer_.setFaderMode(static_cast<joue::mixer::FaderMode>(m));
+                    mixerMode_ = m;
+                    saveUiSettings();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (faderMode != mixerMode_) {
+            mixerMode_ = faderMode;
+            saveUiSettings();
+        }
+        ImGui::TextDisabled("%s", tr("Absolute: the fader goes where the finger is. Relative: it starts from the DAW's value and follows the movement. Hybrid: it waits until the finger reaches the DAW's value."));
+        int finePercent = static_cast<int>(mixerOptions_.fineGain * 100.0 + 0.5);
+        ImGui::SetNextItemWidth(180.0f * scale);
+        if (ImGui::SliderInt(tr("how much a fader moves while fine is held (%)"), &finePercent, 5, 100)) {
+            mixerOptions_.fineGain = static_cast<double>(finePercent) / 100.0;
+            changed = true;
+        }
+        if (mixerOptions_.keyLayout == joue::mixer::KeyLayout::Selects) {
+            int keys = static_cast<int>(mixerOptions_.rightKeys);
+            const char* choices[2] = {tr("move the faders (- and +)"), tr("select tracks 7 and 8")};
+            ImGui::TextUnformatted(tr("The two keys on the right:"));
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(230.0f * scale);
+            if (ImGui::BeginCombo("##rightkeys", choices[keys])) {
+                for (int m = 0; m < 2; ++m) {
+                    if (ImGui::Selectable(choices[m], m == keys)) {
+                        mixerOptions_.rightKeys = static_cast<joue::mixer::RightKeys>(m);
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        }
+        int step = static_cast<int>(mixerOptions_.bankStep);
+        const char* steps[2] = {tr("move one track"), tr("move one bank")};
+        ImGui::TextUnformatted(tr("Moving the faders:"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(160.0f * scale);
+        if (ImGui::BeginCombo("##bankstep", steps[step])) {
+            for (int m = 0; m < 2; ++m) {
+                if (ImGui::Selectable(steps[m], m == step)) {
+                    mixerOptions_.bankStep = static_cast<joue::mixer::BankStep>(m);
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }
+    if (changed) {
+        mixer_.setOptions(mixerOptions_);
+        saveUiSettings();
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    ImGui::TextWrapped("%s", tr("The two buttons on the right of the Scaler: play and record. Its - and + buttons change the octave: do not press them."));
+    ImGui::PopStyleColor();
+    ImGui::TextColored(view.snapshot.playHeld || view.host.play ? ImVec4(0.5f, 1.0f, 0.5f, 1.0f) : ImVec4(0.6f, 0.6f, 0.62f, 1.0f), "%s", tr("Play"));
+    ImGui::SameLine();
+    ImGui::TextColored(view.snapshot.recordHeld || view.host.recording ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f) : ImVec4(0.6f, 0.6f, 0.62f, 1.0f), "%s", tr("Record"));
+    ImGui::Text(tr("Received %llu, sent %llu."), view.received, view.sent);
+    ImGui::Text(tr("From the DAW: %llu messages."), view.fromDaw);
+    if (mixerOptions_.faders == joue::mixer::Faders::Sixteen) {
+        ImGui::Text(tr("Second unit: %llu sent, %llu received."), view.sentExtender, view.fromExtender);
+        const ImVec4 amber(1.0f, 0.72f, 0.3f, 1.0f);
+        if (!view.connected && (mixerOut2Name_.empty() || mixerIn2Name_.empty())) {
+            ImGui::TextColored(amber, "%s", tr("Choose the two ports of the second unit as well, then Connect."));
+        } else if (view.connected && view.connectedForMs > 4000.0) {
+            if (view.fromDaw == 0) ImGui::TextColored(amber, "%s", tr("Nothing has come from the first unit since the connection: in the DAW, check that it uses the first pair of ports."));
+            if (view.fromExtender == 0) ImGui::TextColored(amber, "%s", tr("Nothing has come from the second unit since the connection: in the DAW, check that the extender uses the second pair of ports."));
+        }
+        if (!view.host.names[0].empty() && view.host.names[0] == view.extender.names[0] && view.host.names[1] == view.extender.names[1]) ImGui::TextColored(amber, "%s", tr("Both units show the same tracks: in the DAW the second unit must follow the first, not mirror it."));
+    }
+    ImGui::EndGroup();
+}
+
+void Editor::drawMixerWindow() {
+    bool mixerModule = live_.mixerModulePresent();
+    bool mackieModule = live_.mackieModulePresent();
+    {
+        // the keys of the keyboards that Mackie Control switches off: arm 1 and arm 5, which do not suit every track, and select 1
+        std::bitset<128> wanted;
+        for (const std::string& name : live_.mackiePresetNames()) {
+            if (name == "Mackie Control: Grand Clavier" || name == "Mackie Control: Play Piano") {
+                wanted.set(0);
+                wanted.set(4);
+                wanted.set(24);
+            }
+        }
+        if (wanted != mixerOptions_.blockedNotes) {
+            mixerOptions_.blockedNotes = wanted;
+            mixer_.setOptions(mixerOptions_);
+        }
+    }
+    if (mackieModule != mixerPresentSeen_) {
+        mixerPresentSeen_ = mackieModule;
+        if (mixerAuto_) {
+            if (mackieModule) {
+                mixerOptions_.passThrough = !mixerModule;
+                mixer_.setOptions(mixerOptions_);
+                mixer_.enabled = true;
+                mixerSwitchedOn_ = true;
+                if (mixerAutoOpen_) mixerOpen_ = true;
+                if (!mixer_.connected() && (mixerVirtual_ || (!mixerOutName_.empty() && !mixerInName_.empty()))) {
+                    mixerConnectProblem_.clear();
+                    connectMixerPorts(mixerConnectProblem_);
+                }
+            } else if (mixerSwitchedOn_) {
+                mixer_.enabled = false;
+                mixerSwitchedOn_ = false;
+            }
+        }
+    }
+    if (!mixerOpen_) return;
+    const float scale = ImGui::GetFontSize() / 15.0f;
+    ImGui::SetNextWindowSize(ImVec2(780.0f * scale, 640.0f * scale), ImGuiCond_FirstUseEver);
+    std::string title = std::string(tr("Mackie Control")) + "###mixer";
+    if (!ImGui::Begin(title.c_str(), &mixerOpen_)) {
+        ImGui::End();
+        return;
+    }
+    bool enabled = mixer_.enabled;
+    if (ImGui::Checkbox(tr("Translate"), &enabled)) mixer_.enabled = enabled;
+    if (!live_.listenToPlay) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.72f, 0.3f, 1.0f), "%s", tr("Needs View > Listen to the Play port (touches) switched on."));
+    }
+    ImGui::TextColored(mackieModule ? ImVec4(0.5f, 1.0f, 0.5f, 1.0f) : ImVec4(0.6f, 0.6f, 0.62f, 1.0f), "%s", mackieModule ? tr("A Mackie Control module is on the instrument.") : tr("No Mackie Control module on the instrument."));
+    if (ImGui::Checkbox(tr("Switch on by itself when a Mackie Control module is put on the instrument"), &mixerAuto_)) saveUiSettings();
+    ImGui::SameLine();
+    if (ImGui::Checkbox(tr("and open this window"), &mixerAutoOpen_)) saveUiSettings();
+    MixerBridge::View view = mixer_.view();
+    ImGui::Separator();
+
+    std::vector<LiveView::MackieSurface> surfaces = live_.mackieSurfaces();
+    if (!mixerModule && !surfaces.empty()) drawMackieSurfaces(view, surfaces, scale);
+    else drawMixerScaler(view, scale);
+    ImGui::Separator();
+
+    ImGui::TextUnformatted(tr("Connection to the DAW"));
+    if (!mixerPortsRead_) refreshMixerPorts();
+    auto portCombo = [&](const char* label, bool sources, std::string& chosen) {
+        ImGui::SetNextItemWidth(380.0f * scale);
+        if (ImGui::BeginCombo(label, chosen.empty() ? tr("(none)") : chosen.c_str())) {
+            for (const joue::EndpointInfo& port : mixerPorts_) {
+                if (port.isSource != sources) continue;
+                if (ImGui::Selectable(port.displayName.c_str(), port.displayName == chosen)) {
+                    chosen = port.displayName;
+                    saveUiSettings();
+                }
+            }
+            ImGui::EndCombo();
+        }
+    };
+    ImGui::BeginDisabled(view.connected);
+    if (ImGui::RadioButton(tr("The program creates its own port"), mixerVirtual_)) {
+        mixerVirtual_ = true;
+        saveUiSettings();
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton(tr("Use ports that already exist (loopMIDI, IAC...)"), !mixerVirtual_)) {
+        mixerVirtual_ = false;
+        saveUiSettings();
+    }
+    if (!mixerVirtual_) {
+        portCombo(tr("Send to"), false, mixerOutName_);
+        portCombo(tr("Listen to"), true, mixerInName_);
+        if (mixerOptions_.faders == joue::mixer::Faders::Sixteen) {
+            portCombo(tr("Send to (second unit)"), false, mixerOut2Name_);
+            portCombo(tr("Listen to (second unit)"), true, mixerIn2Name_);
+        }
+    }
+    ImGui::EndDisabled();
+    if (mixerVirtual_) {
+        std::string why;
+        if (joue::virtualPortsAvailable(why)) {
+            ImGui::TextWrapped("%s", tr("In the DAW choose the MIDI port \"Joue Mackie\" (and \"Joue Mackie 2\" for a second unit) as both the input and the output of the Mackie Control."));
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.72f, 0.3f, 1.0f));
+            ImGui::TextWrapped("%s", tr(why.c_str()));
+            ImGui::PopStyleColor();
+            if (ImGui::SmallButton(tr("Get loopMIDI"))) openWithSystem("https://www.tobias-erichsen.de/software/loopmidi.html");
+        }
+    }
+    if (view.connected) {
+        if (ImGui::Button(tr("Disconnect"))) mixer_.disconnect();
+    } else {
+        if (ImGui::Button(tr("Connect"))) {
+            mixerConnectProblem_.clear();
+            connectMixerPorts(mixerConnectProblem_);
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(tr("Refresh the ports"))) refreshMixerPorts();
+    ImGui::TextUnformatted(tr("Try a command on the DAW:"));
+    struct Test {
+        const char* label;
+        int note;
+    };
+    const Test tests[] = {{"Bank <", 46}, {"Bank >", 47}, {"Channel <", 48}, {"Channel >", 49}, {"Up", 96}, {"Down", 97}, {"Select 1", 24}, {"Select 2", 25}, {"Play", 94}, {"Stop", 93}, {"Record", 95}};
+    ImGui::BeginDisabled(!view.connected);
+    for (std::size_t t = 0; t < sizeof tests / sizeof tests[0]; ++t) {
+        if (t > 0) ImGui::SameLine();
+        ImGui::PushID(static_cast<int>(t));
+        if (ImGui::SmallButton(tests[t].label)) mixer_.press(tests[t].note);
+        ImGui::PopID();
+    }
+    if (mixerOptions_.faders == joue::mixer::Faders::Sixteen) {
+        ImGui::SameLine();
+        if (ImGui::SmallButton(tr("Select 1 (second unit)"))) mixer_.press(24, 1);
+        ImGui::SameLine();
+        if (ImGui::SmallButton(tr("Select 2 (second unit)"))) mixer_.press(25, 1);
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton(tr("First track"))) mixer_.goToFirstTrack();
+    ImGui::EndDisabled();
+    if (view.connected) ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "%s: %s", tr("Connected"), view.connection.c_str());
+    if (!mixerConnectProblem_.empty()) ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.45f, 1.0f), "%s", joue::i18n::message(mixerConnectProblem_).c_str());
+    if (!view.problem.empty()) ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.45f, 1.0f), "%s", view.problem.c_str());
+    if (!mixerPortsProblem_.empty()) ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.45f, 1.0f), "%s", mixerPortsProblem_.c_str());
+    ImGui::TextWrapped("%s", tr("The DAW's Mackie Control must use the same two ports the other way round: what the program sends to is the DAW's input, and what it listens to is the DAW's output. On Windows make two ports with loopMIDI, on macOS use the IAC driver."));
+    ImGui::Separator();
+
+    bool paused = mixer_.paused;
+    if (ImGui::Checkbox(tr("Pause the log"), &paused)) mixer_.paused = paused;
+    ImGui::SameLine();
+    bool incoming = mixer_.showIncoming;
+    if (ImGui::Checkbox(tr("Show incoming messages"), &incoming)) mixer_.showIncoming = incoming;
+    ImGui::SameLine();
+    if (ImGui::SmallButton(tr("Clear"))) mixer_.clearLog();
+    ImGui::SameLine();
+    if (ImGui::SmallButton(tr("Copy the log"))) {
+        std::string text;
+        for (const MixerBridge::Line& line : view.lines) {
+            const char* who = line.kind == MixerBridge::Kind::ToDaw ? "to the DAW" : (line.kind == MixerBridge::Kind::FromDaw ? "from the DAW" : (line.kind == MixerBridge::Kind::ToExtender ? "to the second unit" : (line.kind == MixerBridge::Kind::FromExtender ? "from the second unit" : (line.kind == MixerBridge::Kind::FromScaler ? "from the Scaler" : "note"))));
+            text += std::string(who) + "  " + line.text + "\n";
+        }
+        ImGui::SetClipboardText(text.c_str());
+    }
+    ImGui::BeginChild("##mixerlog", ImVec2(0.0f, 0.0f), true);
+    for (const MixerBridge::Line& line : view.lines) {
+        std::string text = joue::i18n::message(line.text);
+        if (line.kind == MixerBridge::Kind::Note) {
+            ImGui::TextColored(ImVec4(0.95f, 0.95f, 0.95f, 1.0f), "%s", text.c_str());
+        } else if (line.kind == MixerBridge::Kind::ToDaw) {
+            ImGui::TextColored(ImVec4(0.55f, 0.85f, 1.0f, 1.0f), "%s  %s", tr("to the DAW"), text.c_str());
+        } else if (line.kind == MixerBridge::Kind::FromDaw) {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.45f, 1.0f), "%s  %s", tr("from the DAW"), text.c_str());
+        } else if (line.kind == MixerBridge::Kind::ToExtender) {
+            ImGui::TextColored(ImVec4(0.45f, 0.8f, 0.95f, 1.0f), "%s  %s", tr("to the second unit"), text.c_str());
+        } else if (line.kind == MixerBridge::Kind::FromExtender) {
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.35f, 1.0f), "%s  %s", tr("from the second unit"), text.c_str());
+        } else {
+            ImGui::TextColored(ImVec4(0.65f, 0.65f, 0.68f, 1.0f), "%s  %s", tr("from the Scaler"), text.c_str());
+        }
+    }
+    if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f) ImGui::SetScrollHereY(1.0f);
+    ImGui::EndChild();
+    ImGui::End();
 }
 
 void Editor::drawDeviceInfoWindow() {
@@ -1653,7 +2561,7 @@ void Editor::drawMenuBar() {
         if (ImGui::IsItemClicked()) aboutPopup_ = true;
     }
     if (ImGui::BeginMenu(tr("File"))) {
-        if (ImGui::MenuItem(tr("New library"))) { loadRoot(joue::emptyLibrary(), "New empty library."); dirty_ = true; }
+        if (ImGui::MenuItem(tr("New library"))) { loadRoot(joue::emptyLibrary(), "New empty library.", false); dirty_ = true; }
         if (ImGui::MenuItem(tr("Open..."))) {
             if (dialogsAvailable()) {
                 if (auto path = chooseOpenFile()) openFromPath(*path);
@@ -1707,6 +2615,7 @@ void Editor::drawMenuBar() {
             deviceInfoOpen_ = true;
             live_.requestDeviceInfo();
         }
+        ImGui::MenuItem(tr("Mackie Control..."), nullptr, &mixerOpen_);
         ImGui::MenuItem(tr("Module designer"), nullptr, &designer_.open);
         ImGui::MenuItem(tr("Live instrument"), nullptr, &live_.open);
         if (ImGui::BeginMenu("Language / Langue")) {
@@ -1735,7 +2644,8 @@ void Editor::drawMenuBar() {
     if (ImGui::BeginMenu(tr("Help"))) {
         if (ImGui::MenuItem(tr("Quick start"), "F1")) helpOpen_ = true;
         if (ImGui::MenuItem(tr("User guide"))) openGuide(false);
-        if (ImGui::MenuItem(tr("Module designer guide"))) openGuide(true);
+        if (ImGui::MenuItem(tr("Module designer guide"))) openGuide(1);
+        if (ImGui::MenuItem(tr("Mackie Control guide"))) openGuide(2);
         ImGui::Separator();
         if (ImGui::MenuItem(tr("Check for updates at start"), nullptr, &checkUpdates_)) saveUiSettings();
         if (ImGui::MenuItem(tr("Check now"))) {
@@ -1743,6 +2653,9 @@ void Editor::drawMenuBar() {
             update_.start(about::Repository);
         }
         if (ImGui::MenuItem(tr("Releases page"))) openExternal(std::string("https://github.com/") + about::Repository + "/releases");
+        ImGui::Separator();
+        if (ImGui::MenuItem(tr("Copy a bug report"))) copyBugReport();
+        if (ImGui::MenuItem(tr("Report a bug..."))) openExternal(std::string("https://github.com/") + about::Repository + "/issues/new?template=bug_report.md");
         ImGui::EndMenu();
     }
     if (ImGui::MenuItem(tr("About"))) aboutPopup_ = true;
@@ -1859,7 +2772,7 @@ void Editor::drawContent() {
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button(tr("New empty library"))) { loadRoot(joue::emptyLibrary(), "New empty library."); dirty_ = true; }
+        if (ImGui::Button(tr("New empty library"))) { loadRoot(joue::emptyLibrary(), "New empty library.", false); dirty_ = true; }
         return;
     }
     if (!selected_) {

@@ -1202,6 +1202,22 @@ void Designer::drawInspector() {
     if (ImGui::Button(tr("Isomorphic grid..."))) ImGui::OpenPopup("isogrid");
     ImGui::SameLine();
     if (ImGui::Button(tr("Fretboard..."))) ImGui::OpenPopup("fretboard");
+    ImGui::SameLine();
+    if (ImGui::Button(tr("Mackie Control..."))) ImGui::OpenPopup("mackiecontrol");
+    if (ImGui::BeginPopup("mackiecontrol")) {
+        ImGui::TextUnformatted(tr("Pads for Mackie Control, on channel 1 and at full velocity, as the buttons of a Mackie surface are."));
+        const std::vector<joue::MackieLayout>& layouts = joue::mackieLayouts();
+        for (int l = 0; l < static_cast<int>(layouts.size()); ++l) {
+            if (ImGui::RadioButton(tr(layouts[static_cast<std::size_t>(l)].name), mackieLayout_ == l)) mackieLayout_ = l;
+        }
+        ImGui::TextDisabled("%s", tr("Faders are not made here: a strip of the designer sends a controller, and a Mackie fader is pitch bend. For faders use the Strips or Rounds preset."));
+        if (ImGui::Button(tr("Add"))) {
+            pushUndo();
+            design_.addMackieLayout({4, 4, design_.widthMm() - 8, joue::Design::HeightMm - 8}, mackieLayout_);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
     if (ImGui::BeginPopup("padgrid")) {
         ImGui::SetNextItemWidth(90 * scale); ImGui::InputInt(tr("Rows"), &gridRows_);
         ImGui::SetNextItemWidth(90 * scale); ImGui::InputInt(tr("Columns"), &gridColumns_);

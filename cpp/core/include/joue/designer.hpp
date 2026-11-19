@@ -41,6 +41,13 @@ struct Box {
     int x = 0, y = 0, w = 0, h = 0;
 };
 
+// A ready layout of pads for Mackie Control: a grid whose notes are consecutive Mackie notes, so that its rows are blocks of buttons.
+struct MackieLayout {
+    const char* name;
+    int rows, columns, firstNote, rowStep;
+};
+const std::vector<MackieLayout>& mackieLayouts();
+
 // One numeric field of an element record: where it lives, how wide it is and its sensible range.
 struct FieldSpec {
     const char* name;
@@ -109,6 +116,8 @@ public:
     // that would reach off the surface or does not fit in the blob. Returns the indexes of the new elements.
     std::vector<std::size_t> repeat(const std::vector<std::size_t>& indices, int copies, int dx, int dy, int noteStep);
     std::size_t addPadGrid(Box area, int rows, int columns, int gap, int firstNote, int rowStep, int channel);
+    // Pads that send the Mackie Control notes of one of the layouts, on channel 1 and at full velocity, as a Mackie button does.
+    std::size_t addMackieLayout(Box area, int layout);
     // Pads whose note is firstNote + column * columnInterval + row * rowInterval; with stagger every other row is shifted by half a pad.
     std::size_t addIsomorphicGrid(Box area, int rows, int columns, int gap, int firstNote, int columnInterval, int rowInterval, int channel, bool stagger);
     // One string element per open-string note, the first at the low side of the area, as the Grand Fretboard has them.

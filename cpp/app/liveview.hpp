@@ -1,4 +1,5 @@
 #pragma once
+#include "joue/instrumentmodule.hpp"
 #include <array>
 #include <atomic>
 #include <deque>
@@ -6,6 +7,7 @@
 #include <functional>
 #include <optional>
 #include <memory>
+#include <set>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -22,6 +24,7 @@
 class LiveView {
 public:
     bool open = false;
+    void setPlayHook(std::function<void(const joue::Bytes&)> hook);
     std::atomic<bool> listenToPlay{true};  // listens to the Play port (the touches); off, the program does not hold that port at all
     bool safeGraphics = false;  // draws the device without a texture (for graphics drivers that show a texture black)
     ~LiveView();
@@ -29,6 +32,9 @@ public:
 
     // Called with the slot and the bytes read when the user asks to edit the layout of a module.
     std::function<void(int, const joue::Bytes&)> onEdit;
+    // The Mackie Control preset that a module's bytes carry and the name of the original preset of that kind of module, both empty when it
+    // carries none. Called on the scanning thread.
+    std::function<std::pair<std::string, std::string>(const joue::Bytes&)> mackieName;
     // Pushing an edited layout into the module of a slot; the work is done by the thread that owns the connection.
     bool canPush(int slot);
     // A layout sent to the board without writing it to a module (see Device::loadTemporarily): shown in slot 1 as a temporary module.
@@ -39,6 +45,7 @@ public:
     bool playBoard();
     // True when the board announced a module in the slot whose tag turned out to be a new, blank one.
     bool newTagIn(int slot);
+    bool mixerModulePresent();
     void requestWriteTag(int slot, const joue::Bytes& layout);
     // Erases the tag in a slot, only when it holds a custom layout (see joue::blankTag).
     void requestEraseTag(int slot);
@@ -66,6 +73,20 @@ public:
         joue::Bytes raw;  // the bytes read from the module
     };
     std::vector<LiveModule> modules();  // the modules detected now
+    // A module of the instrument that runs a Mackie Control preset and is not translated: what it sends is passed on, and the Mackie Control
+    // window draws it.
+    struct MackieSurface {
+        joue::PlacedModule placed;
+        joue::Design design;
+        std::string preset, original;
+        joue::SettingValues settings;  // what the module's bytes say, for each element and setting
+        std::vector<std::string> names;  // the library element of each record of the design
+        int keys = 0;  // how many keys the module has, when its controls are keys of a keyboard
+        std::vector<int> notes;  // the note of each record of the design that is a pad or a key, or -1
+    };
+    std::vector<MackieSurface> mackieSurfaces();
+    bool mackieModulePresent();
+    std::vector<std::string> mackiePresetNames();  // the Mackie Control preset of each module that runs one  // a module of the instrument runs a Mackie Control preset, translated or not
     void requestPush(int slot, const joue::Bytes& original, const joue::Bytes& edited);
     std::string pushStatus();  // progress or result of the last push, empty when there was none
 
@@ -73,10 +94,13 @@ public:
     void drawPanel(float height);
 
 private:
+    std::set<std::string> mackieAnnounced_;  // slot and preset already announced in a popup, so that it opens once
     friend struct LiveViewTestAccess;  // the tests drive the scan with a simulated board
     struct Shown {
         std::vector<joue::PlacedModule> placed;
         std::vector<joue::Design> designs;
+        bool mixer = false;  // a module of the instrument has the layout of the Scaler Mixer preset
+        std::vector<std::pair<std::string, std::string>> mackie;  // for each placed module, the Mackie Control preset it runs and the original preset, or empty
         std::array<bool, 3> newTags{};  // a slot that holds a new, blank tag: not a module
         std::vector<std::pair<int, std::string>> unreadable;  // a module the board announced whose layout could not be read: slot, what the board said
     };
@@ -127,6 +151,8 @@ private:
     bool infoBusy_ = false;  // guarded by mutex_
     double virtualRebaseUntilMs_ = 0;  // after a rescan the board announces its modules again; until then the temporary layout is not judged by them, guarded by mutex_
     std::atomic<int> limitations_{-1};  // the limitation flags of the board, -1 until it has answered
+    std::mutex hookMutex_;
+    std::function<void(const joue::Bytes&)> playHook_;
     std::array<std::string, 3> unreadable_{}, unreadReason_{}, shownUnreadable_{};  // worker thread only
     std::array<bool, 3> newTags_{}, shownNewTags_{};  // worker thread only
     std::array<int, 3> readTries_{};        // failed tries to read the layout announced in a slot, since its last insertion; worker thread only

@@ -21,7 +21,7 @@ Joué Revival reads and edits the preset libraries of the original Joué Editor,
 
 ## Install a release
 
-Download the package for your system from the latest release on the Releases page (the packages are built by GitHub Actions). Each package contains this README, the [User guide](docs/user-guide.md) and the [Module designer guide](docs/module-designer.md).
+Download the package for your system from the latest release on the Releases page (the packages are built by GitHub Actions). Each package contains this README, the [User guide](docs/user-guide.md) and the [Module designer guide](docs/module-designer.md) and the [Mackie Control guide](docs/mixer-bridge.md).
 
 ### Windows
 
@@ -54,6 +54,8 @@ Download `joue-revival-linux-x86_64.AppImage`, make it executable (`chmod +x jou
 ## What you can do with Joué Revival
 
 - **Browse and edit libraries:** the factory presets (loaded at the first start; locked, and not deletable), your own folders and copies, saved with a backup of the previous file.
+- **Mackie Control presets for the other modules (mostly untried):** one preset for each of eleven modules, in the library folder **Mackie presets** (below the Play presets, open at start, with the Scaler mixer preset), make the Pro Matrix, Strips, Rounds, Bubbles, Grand Clavier, Synth, Play Piano, Play Drum, Play Audio and Play Keys send Mackie Control messages; the Matrix and the Grand Clavier were checked against real module data, the others only against the program's tables (see [docs/mackie-presets.md](docs/mackie-presets.md)).
+- **Try the Scaler as a Mackie Control mixing surface (preview):** the Scaler mixer preset and the Mackie Control window send Mackie Control messages to a DAW through a MIDI port that the program makes itself (or two ports you choose); no real DAW has been tried yet. See [docs/mixer-bridge.md](docs/mixer-bridge.md).
 - **See the instrument live:** the modules in the slots, the touches, the octave of the keys; **touch to select**, which selects in the editor the element your finger is on; **Rescan modules** and a detection log when something looks wrong.
 - **Edit a module in the instrument:** the Action of buttons and pads, notes, scales (23 of the original and 47 more), the bubble, the Y control, pressure range, MPE and aftertouch; then upload the changes, or restore the original. A module with a custom layout opens in the module designer instead.
 - **Upload a preset to a module** of the same type, with the list of what will change; **compare** two presets, or a preset with the module in the instrument, without writing anything.
@@ -62,6 +64,26 @@ Download `joue-revival-linux-x86_64.AppImage`, make it executable (`chmod +x jou
 - **Design a layout:** pads, keys, strips, strings and areas with mouse gestures (selection rectangle, Ctrl-drag to move, Shift-drag to resize), in a window that can leave the main window; pad grids, keyboards, isomorphic grids and fretboards as templates; align, distribute, flip and repeat; the parameters of the manufacturer's modules (pressure range, MPE and its channels, aftertouch, Y control); vibrato and glissando of the module; buttons with the Actions of the manufacturer's (vibrato, sustain, channel selection, bending, Y control, aftertouch, glissando, fretless, octave); print it at real size; try it on the instrument as a temporary layout; write it to a blank NTAG216 tag (a new tag counts as blank); erase a tag that holds a custom layout. See the [Module designer guide](docs/module-designer.md).
 
 See the [User guide](docs/user-guide.md) for the windows, the files and troubleshooting. The interface is in English or French (**View > Language / Langue**); the documents are in both: [README.fr.md](README.fr.md), [guide de l'utilisateur](docs/user-guide.fr.md), [guide du concepteur de modules](docs/module-designer.fr.md).
+
+## Mackie Control
+
+Joué Revival can make the instrument a control surface for a DAW that speaks Mackie Control, such as Bitwig Studio or Ableton Live. This is a preview: the Scaler mixer preset has been tried with Bitwig, the other presets have not been tried on a real module.
+
+- **The Mackie Control window** (**View > Mackie Control...**) translates the Scaler into a mixing surface (master and 8 faders, fine, shift, transport, solo, mute, arm, pan, banks, three fader modes), and for the other modules draws the module itself, each control with what it does, lit when pressed, with the lamps and faders of the DAW.
+- **One preset for each module**, named *Mackie Control: <module>*, in the library folder **Mackie presets** (below the Play presets). A module that runs one is marked in red next to **Edit** in the live instrument, and putting it on the instrument switches Mackie Control on, opens its window and opens the MIDI port.
+- **Its own MIDI port**, `Joue Mackie`, made by the program: on Windows it uses the driver that loopMIDI installs (install loopMIDI once, no port to create), on macOS and Linux the system's virtual ports. Ports that already exist can be used instead.
+- **The module designer** makes pads for Mackie Control too (**Generate > Mackie Control...**): arm, solo, mute and select, transport, banks, cursors. A module designed that way is recognised by the Mackie Control window.
+- The guides: the [Mackie Control guide](docs/mixer-bridge.md) and the [Mackie Control presets](docs/mackie-presets.md), also in the **Help** menu.
+
+## Reporting a bug
+
+Good reports are quick to fix. In Joué Revival:
+
+1. With the instrument connected, open **View > Device information...** and press **Read again**.
+2. Choose **Help > Copy a bug report**: the version, the system, the device information, the modules on the instrument, the detection log and the state of Mackie Control are copied as one text.
+3. Choose **Help > Report a bug...**: a new issue opens on GitHub, with a form. Say what you did, what you expected and what happened, and paste the report where the form says so, between the two lines of three quotes.
+
+For a module that is not detected, **Copy the detection log** in the live panel (**Details**, then **Detection log**) gives just the log. For a problem with Mackie Control, **Copy the log** in its window gives what the program and the DAW said to each other. The device information holds the serial number of your board: remove that line if you prefer. If you can, attach the module file (open the module with **Edit** in the live panel, then **Save** in the designer).
 
 ## Build from source (for advanced users)
 
